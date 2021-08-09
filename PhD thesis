@@ -1,0 +1,3851 @@
+
+#### PhD Thesis: Change-point detection for a transient change and high-dimensional covering
+#### Year: 2021
+#### Author: Jack Noonan 
+#### Email: Noonanj1@cardiff.ac.uk
+
+
+#############
+
+# This script contains the majority of code used within the thesis. 
+# Please search (ctrl F) for the chapter and number, e.g. "Chapter 6", to locate the relevant code.
+# Note that this script focuses mainly on the Monte Carlo simulations and does not include all code used within the PhD.
+# Many of the figures and table in this thesis can be reproduced with the below code. At the beginning of each chunk of code,
+# the relevant figure or table should be mentioned.
+# Many Monte Carlo simulations will use the R package 'snow' to run in parallel and speed up total simulations.
+# Please install snow and specificy how many cores you would like to run simulations on (depends on your processor).
+# install.packages('snow').
+# Please also install all other packages below.
+
+##############
+
+library('snow')
+library('statmod')
+library('rARPACK')
+library('FrF2')
+library('SobolSequence')
+library('numDeriv')
+
+number_of_cores  = 8  # we will initially run simulations on 8 cores
+
+
+############################################
+#### Code for main results of Chapter 1 ####
+############################################
+
+# The below code reproduces Figures 1.1
+
+M=50
+A=1
+l0=10
+l1=20
+samp_num=1000
+H_seq=seq(3.5,11.5,0.25)*A
+
+GT = function(){
+  sample_matrix=matrix(0,nrow=samp_num,ncol=1)
+  
+  track = 0
+  
+  for (k in 1:samp_num){
+    
+    sample = rnorm(M+l1,0,1)
+    max = NULL
+    
+    for (i in 1:(length(sample)-1)){
+      for (j in (i+1):length(sample)){
+        
+        if ((j-i+1)>=l0 & (j-i+1)<=l1 ){
+          max=max(max, A*(sum(sample[i:j])-0.5*A*(j-i+1))   )
+          print(i)
+        }
+     
+      }
+    }
+    sample_matrix[k,]=max
+    
+  }
+  
+  sample_matrix
+}
+
+cl <- makeCluster(rep('localhost',number_of_cores),type='SOCK')
+clusterExport(cl,c('GT','samp_num','n','l0','l1','A'))
+data1 = clusterEvalQ(cl,GT())
+stopCluster(cl)
+Data = unlist(lapply(data1,function(x){x}))
+
+prob_track=NULL
+for (H in H_seq){
+  prob_track=c(prob_track,sum(Data>H)/length(Data))
+}
+
+par(mar=c(5.1,6.2,4.1,2.1))
+plot(H_seq,prob_track,type='l',ylab='',xlab='H',lty=2,xaxt="n",yaxt='n',lwd=7,xaxs="i",yaxs="i",cex.axis=2.4,cex.lab=2.5)
+axis(1, at=seq(3.5,11.5,0.5)*A, cex.axis=2.5)
+axis(side = 2, tck = -.015, labels = NA)
+axis(side = 2, lwd = 0, line = 0.7, las = 1, cex.axis=2.5)
+
+samp_num=10000
+GT = function(){
+  sample_matrix=matrix(0,nrow=samp_num,ncol=1)
+  track = 0
+  for (k in 1:samp_num){
+    
+    sample = rnorm(3*l1,0,1)
+    max = NULL
+    
+    for (i in 1:(length(sample)-1)){
+      for (j in (i+1):length(sample)){
+        
+        if ((j-i+1)>=l0 & (j-i+1)<=l1 ){
+          max=max(max, A*(sum(sample[i:j])-0.5*A*(j-i+1))   )
+          print(i)
+        }
+      }
+    }
+    sample_matrix[k,]=max
+    
+  }
+  
+  sample_matrix
+}
+
+cl <- makeCluster(rep('localhost',number_of_cores),type='SOCK')
+clusterExport(cl,c('GT','samp_num','M','l0','l1','A'))
+data1 = clusterEvalQ(cl,GT())
+stopCluster(cl)
+Data = unlist(lapply(data1,function(x){x}))
+
+
+prob_track2=NULL
+for (H in H_seq){
+  prob_track2=c(prob_track2,sum(Data<H)/length(Data))
+}
+
+GT = function(){
+  sample_matrix=matrix(0,nrow=samp_num,ncol=1)
+  
+  track = 0
+  
+  for (k in 1:samp_num){
+    
+    sample = rnorm(2*l1,0,1)
+    max = NULL
+    
+    
+    for (i in 1:(length(sample)-1)){
+      for (j in (i+1):length(sample)){
+        
+        if ((j-i+1)>=l0 & (j-i+1)<=l1 ){
+          max=max(max, A*(sum(sample[i:j])-0.5*A*(j-i+1))   )
+          print(i)
+        }
+        
+      }
+    }
+    sample_matrix[k,]=max
+    
+  }
+  
+  sample_matrix
+}
+
+
+cl <- makeCluster(rep('localhost',number_of_cores),type='SOCK')
+clusterExport(cl,c('GT','samp_num','M','l0','l1','A'))
+data1 = clusterEvalQ(cl,GT())
+stopCluster(cl)
+Data = unlist(lapply(data1,function(x){x}))
+
+
+prob_track3=NULL
+for (H in H_seq){
+  prob_track3=c(prob_track3,sum(Data<H)/length(Data))
+}
+
+
+
+lines(H_seq,1-prob_track2*(prob_track2/prob_track3)^(n/l1-2),col='blue',lwd=4)
+
+
+# The below code reproduces Figures 1.2 and Figure 1.3
+## Approximations using results of D. Siegmund (to be run when l_0=1)
+
+M=250
+A=1
+l0=1
+l1=50
+samp_num=1000
+H_seq=seq(1,9,0.25)*A
+
+
+
+GT = function(){
+  sample_matrix=matrix(0,nrow=samp_num,ncol=1)
+  
+  track = 0
+  
+  for (k in 1:samp_num){
+    
+    sample = rnorm(M+l1,0,1)
+    max = NULL
+    
+    for (i in 1:(length(sample)-1)){
+      for (j in (i+1):length(sample)){
+        
+        if ((j-i+1)>=l0 & (j-i+1)<=l1 ){
+          max=max(max, A*(sum(sample[i:j])-0.5*A*(j-i+1))   )
+          print(i)
+        }
+        
+      }
+    }
+    sample_matrix[k,]=max
+    
+  }
+  
+  sample_matrix
+}
+
+
+cl <- makeCluster(rep('localhost',number_of_cores),type='SOCK')
+clusterExport(cl,c('GT','samp_num','M','l0','l1','A'))
+data1 = clusterEvalQ(cl,GT())
+stopCluster(cl)
+Data = unlist(lapply(data1,function(x){x}))
+
+
+
+
+prob_track=NULL
+for (H in H_seq){
+  prob_track=c(prob_track,sum(Data>H)/length(Data))
+}
+
+
+lines(H_seq,prob_track,type='l',lty=2,lwd=7)
+
+
+par(mar=c(5.1,6.2,4.1,2.1))
+plot(H_seq,prob_track,type='l',ylim=c(0,1),ylab='',xlab='H',lty=2,xaxt="n",yaxt='n',lwd=7,xaxs="i",yaxs="i",cex.axis=2.4,cex.lab=2.5)
+axis(1, at=H_seq, cex.axis=2.5)
+axis(side = 2, tck = -.015, labels = NA)
+axis(side = 2, lwd = 0, line = 0.7, las = 1, cex.axis=2.5)
+
+
+Siegmund_bcp_approx = NULL
+
+for (H in H_seq){
+  
+  H=H/A
+  M1=3*l1
+  
+  f1 = function(b){
+    (A*(M1*A/2 - b)+3)*exp(-A*b)
+  }
+  
+  f1=Vectorize(f1)
+  p1=min(f1(H+0.583*2),1)
+  
+  M1=2*l1
+  
+  f1 = function(b){
+    (A*(M1*A/2 - b)+3)*exp(-A*b)
+  }
+  
+  f1=Vectorize(f1)
+  p2=min(f1(H+0.583*2),1)
+  
+  
+  prob= 1-(1-p1)*((1-p1)/(1-p2))^(M/l1-2)
+  Siegmund_bcp_approx=c(Siegmund_bcp_approx,prob)
+
+  
+}
+lines(H_seq,Siegmund_bcp_approx,col='red',lwd=4)
+
+
+
+
+# The below code reproduces Tables 1.4 and Tables 1.5
+### Average run length Monte Carlo and simulations
+
+H1  = seq(-5,-2,0.5)
+A=1
+l0=25
+l1=50
+
+samp_num=10000
+
+GT = function(){
+  sample_matrix=matrix(0,nrow=samp_num,ncol=1)
+  
+  track = 0
+  
+  for (k in 1:samp_num){
+    
+    sample = rnorm(3*l1,0,1)
+    max = NULL
+    
+    
+    for (i in 1:(length(sample)-1)){
+      for (j in (i+1):length(sample)){
+        
+        if ((j-i+1)>=l0 & (j-i+1)<=l1 ){
+          max=max(max, A*(sum(sample[i:j])-0.5*A*(j-i+1))   )
+          print(i)
+        }
+        
+      }
+    }
+    sample_matrix[k,]=max
+    
+  }
+  
+  sample_matrix
+}
+
+cl <- makeCluster(rep('localhost',number_of_cores),type='SOCK')
+clusterExport(cl,c('GT','samp_num','n','l0','l1','A'))
+data1 = clusterEvalQ(cl,GT())
+stopCluster(cl)
+Data = unlist(lapply(data1,function(x){x}))
+
+
+
+GT = function(){
+  sample_matrix=matrix(0,nrow=samp_num,ncol=1)
+  
+  track = 0
+  
+  for (k in 1:samp_num){
+    
+    sample = rnorm(2*l1,0,1)
+    max = NULL
+    
+    
+    for (i in 1:(length(sample)-1)){
+      for (j in (i+1):length(sample)){
+        
+        if ((j-i+1)>=l0 & (j-i+1)<=l1 ){
+          max=max(max, A*(sum(sample[i:j])-0.5*A*(j-i+1))   )
+          print(i)
+        }
+        
+      }
+    }
+    sample_matrix[k,]=max
+    
+  }
+  
+  sample_matrix
+}
+
+
+cl <- makeCluster(rep('localhost',number_of_cores),type='SOCK')
+clusterExport(cl,c('GT','samp_num','n','l0','l1','A'))
+data1 = clusterEvalQ(cl,GT())
+stopCluster(cl)
+Data2 = unlist(lapply(data1,function(x){x}))
+
+
+F2=NULL
+for (H in H1){
+  F2=c(F2,sum(Data<H)/length(Data))
+}
+
+
+F1=NULL
+for (H in H1){
+  F1=c(F1,sum(Data2<H)/length(Data2))
+}
+
+
+theta=F2/F1
+ARL_approx = l1- l1*F2/(theta^2*log(theta))
+
+
+ARL_sim =NULL
+for (H in H1){
+
+GT = function(){
+
+ARL_SIM = NULL
+
+for (k in 1:1000){
+
+track = l1
+max=-Inf
+n=0
+sample = rnorm(n+l1,0,1)
+
+for (i in 1:(length(sample)-1)){
+  for (j in (i+1):length(sample)){
+    
+    if ((j-i+1)>=l0 & (j-i+1)<=l1 ){
+      max=max(max, A*(sum(sample[i:j])-0.5*A*(j-i+1))   )
+      
+    }
+    
+  }
+}
+
+
+while (max <H){
+  sample=c(sample, rnorm(1,0,1))
+  track=track+1
+  n = length(sample)
+  
+  for (i in 1:(length(sample)-1)){
+      
+      if ((n-i+1)>=l0 & (n-i+1)<=l1 ){
+        max=max(max, A*(sum(sample[i:n])-0.5*A*(n-i+1))   )
+
+      }
+      
+  }
+
+
+
+  #print(track)
+}
+print(k)
+ARL_SIM=c(ARL_SIM,track)
+}
+
+mean(ARL_SIM)
+}
+cl <- makeCluster(rep('localhost',8),type='SOCK')
+clusterExport(cl,c('GT','samp_num','n','l0','l1','A','ARL_SIM','H'))
+data1 = unlist(clusterEvalQ(cl,GT()))
+data1=unlist(data1)
+stopCluster(cl)
+
+ARL_sim=c(ARL_sim,mean(data1))
+print(ARL_sim)
+}
+
+
+ARL_approx
+ARL_sim
+
+
+# The below code reproduces the approximation in Table 1.5
+## ARL approx using D. Siegmund approximation
+
+Siegmund_approx = NULL
+
+for (H in H1){
+  
+  F1 = 1-(A*(A*l1-H/A-2*0.583 )+3)*exp(-A*(H/A+2*0.583))
+  F2 =  1-(A*(3*A*l1/2-H/A-2*0.583 )+3)*exp(-A*(H/A+2*0.583))
+  
+  theta = F2/F1
+  
+  Siegmund_approx=c(Siegmund_approx, l1- l1*F2/(theta^2*log(theta))    )
+}
+
+
+
+
+
+
+### Comparing the power of three tests.
+# The below code reproduces Figure 1.8
+
+## Part 1 - Simulation for MOSUM as a function of lambda
+
+l=20
+ARL=500
+A=0.5
+samp_num=10000
+
+stat2 = NULL
+for (L in seq(40,10,-2) ){
+  stat=NULL
+  
+  ARL_fun = function(x){
+    astar =x
+    a= astar + 0.583*sqrt(2)/sqrt(L)
+    b=0
+    
+    
+    p_2 = function(s_2){
+      f_s = function(s){
+        
+        M = matrix(0,3,3)
+        M[1,1] =pnorm(a)
+        M[2,1] =dnorm(a)
+        M[3,1] = dnorm(2*a-s)
+        M[1,2] =pnorm(s)
+        M[2,2] =dnorm(s)
+        M[3,2] = dnorm(a)
+        M[1,3] =pnorm(s+s_2-a)
+        M[2,3] =dnorm(s+s_2-a)
+        M[3,3] = dnorm(s_2)
+        
+        det(M)
+      }
+      f_s = Vectorize(f_s)
+      integrate(f_s,-Inf,a)$value
+      
+      
+    }
+    
+    
+    p_2 = Vectorize(p_2)
+    
+    lambda_num =integrate(p_2,-20,a)$value
+    
+    
+    
+    ana = function(x){
+      
+      ana2 = function(k){
+        M = matrix(0,2,2)
+        M[1,1] = dnorm(x)
+        M[1,2] = dnorm(-k-a-b)
+        M[2,1] = dnorm(a)
+        M[2,2] = dnorm(-k-x-b)
+        det(M)*exp(-b^2/2+b*(k+b+x))
+        
+      }
+      ana2 = Vectorize(ana2)
+      integrate(ana2,-x-a-b,10)$value
+      
+      
+      
+    }
+    
+    ana = Vectorize(ana)
+    lambda_denom = integrate(ana,-10,a)$value
+    
+    lambda = lambda_num/lambda_denom
+    
+    
+    ARL=-L*lambda_num/(lambda^2*log(lambda))
+    ARL
+  }
+  
+  inverse = function (f, lower, upper) {
+    function (y) uniroot((function (x) f(x) - y), lower = lower, upper = upper)[1]
+  }
+  
+  square_inverse = inverse(ARL_fun, 2,4)
+  Suitable_ARL_alpha= square_inverse(ARL-L)$root
+  h = Suitable_ARL_alpha
+  print(h)
+  
+  for (u in c(1:samp_num)){
+    
+    
+    V = c(rnorm(2*L,0,1),rnorm(l,A,1),rnorm(7*L,0,1))
+    
+    MOSUM = NULL
+    
+    for (i in c(1:(4*l))){
+      
+      MOSUM=c(MOSUM,sum(V[(i):(i+L-1)])/sqrt(L))
+      
+    }
+    
+    if (all(MOSUM[1:L]<h)){
+      
+      stat=c(stat,ifelse(any(MOSUM[(L+1):(L+2*l-1)]>h),1,0))
+    }
+    
+    #print(u)
+  }
+  
+  stat2 = c(stat2,sum(stat)/length(stat))
+  print(L)
+}
+
+stat2
+
+
+
+par(mar=c(6.1,5.5,4.1,2.1))
+plot(l/seq(40,10,-2),stat2,type='l',ylab='',xlab='',lty=1,lwd=4,xaxt="n",yaxt='n',cex.axis=2.4,cex.lab=2.5)#ylim=c(min(stat2),0.82))
+axis(1, at=seq(0,10,0.5), cex.axis=2.5)
+axis(side = 2, tck = -.015, labels = NA)
+axis(side = 2, lwd = 0, line = 0.35, las = 1, cex.axis=2.5)
+mtext(side=1, text=expression(paste(lambda)), line=5,cex=4)
+
+
+## Part 2 - Generalised MOSUM barrier determination (based on ARL) and power
+
+
+
+ARL_sim =NULL
+H=3.6
+A=0.5
+l0=10
+l1=40
+samp_num=1000
+
+GT = function(){
+  
+  ARL_SIM = NULL
+  
+  for (k in 1:samp_num){
+    
+    track = l1
+    max=-Inf
+    n=0
+    sample = rnorm(n+l1,0,1)
+    
+    for (i in 1:(length(sample)-1)){
+      for (j in (i+1):length(sample)){
+        
+        if ((j-i+1)>=l0 & (j-i+1)<=l1 ){
+          max=max(max, A*(sum(sample[i:j])-0.5*A*(j-i+1))   )
+          
+        }
+        
+      }
+    }
+    
+    
+    while (max <H){
+      sample=c(sample, rnorm(1,0,1))
+      track=track+1
+      n = length(sample)
+      
+      for (i in 1:(length(sample)-1)){
+        
+        if ((n-i+1)>=l0 & (n-i+1)<=l1 ){
+          max=max(max, A*(sum(sample[i:n])-0.5*A*(n-i+1))   )
+          
+        }
+        
+      }
+      
+      
+      
+      #print(track)
+    }
+    print(k)
+    ARL_SIM=c(ARL_SIM,track)
+  }
+  
+  mean(ARL_SIM)
+}
+cl <- makeCluster(rep('localhost',number_of_cores),type='SOCK')
+clusterExport(cl,c('GT','samp_num','l0','l1','A','ARL_SIM','H'))
+data1 = unlist(clusterEvalQ(cl,GT()))
+data1=unlist(data1)
+stopCluster(cl)
+
+ARL_sim=mean(data1)
+ARL_sim
+
+
+
+H=3.55
+G_MOSUM_power=NULL
+samp_num=1000
+for (u in c(1:samp_num)){
+  
+  sample = c(rnorm(2*l1,0,1),rnorm(l,A,1),rnorm(5*l1,0,1))
+  G_MOSUM = NULL
+ 
+  k=l1
+  while( k <=length(sample)){
+  
+  max=-Inf
+
+  for (i in 1:(l1-1)){
+    for (j in (i+1):l1){
+      if ((j-i+1)>=l0 & (j-i+1)<=l1 ){
+        max=max(max, A*(sum(sample[i:j])-0.5*A*(j-i+1))   )
+      }
+    }
+  }
+
+    for (i in 1:(k-1)){
+      if ((k-i+1)>=l0 & (k-i+1)<=l1 ){
+        max=max(max, A*(sum(sample[i:k])-0.5*A*(k-i+1))   )
+      }
+    }
+  G_MOSUM=c(G_MOSUM,max)
+  k=k+1
+  }
+
+  if (all(G_MOSUM[1:l1]<H)){
+    G_MOSUM_power=c(G_MOSUM_power,ifelse(any(G_MOSUM[(l1+1):(l1+2*l-1)]>H),1,0))
+  }
+  print(u)
+}
+
+G_MOSUM_power2 = sum(G_MOSUM_power)/length(G_MOSUM_power)
+G_MOUSM_power2
+abline(h=G_MOSUM_power2,lwd=4,lty=5,col='orange')
+
+
+## Part 3 - CUSUM barrier determination (ARL) and power
+
+H=37.88 #obtained from paper of moustakides and polunchenko
+samp_num = 50000
+A=0.5
+
+Change_point=40  ## select large enough ot obtain stationary distribution
+CUSUM_statistics = matrix(0,nrow=samp_num,ncol=(Change_point+2*l))
+CUSUM_statistics[,1] =rep(1,samp_num)
+for (i in c(1:samp_num)){
+  for (j in c(2:(Change_point+2*l))){
+    if (j>Change_point & j<=(Change_point+l)){
+      x = rnorm(1,A,1)
+    }
+    else{
+      x = rnorm(1,0,1)
+    }
+    CUSUM_statistics[i,j] = max(1,CUSUM_statistics[i,(j-1)])*exp((-(x-A)^2+x^2)/2)
+  }
+  print(i)
+}
+
+index_track = NULL
+for (i in (1:samp_num)){
+  if (all(CUSUM_statistics[i,c(1:Change_point)]<H)){
+    index_track = c(index_track,i)
+  }
+}
+
+CUSUM_statistics2 = CUSUM_statistics[index_track,]
+CUSUM_power= sum(apply(CUSUM_statistics2,1,function(x){any((x>=H))}))/dim(CUSUM_statistics2)[1]
+CUSUM_power
+abline(h=CUSUM_power,lwd=4,col='blue',lty=2)
+
+
+
+
+
+############################################
+#### Code for main results of Chapter 2 ####
+############################################
+
+
+
+# The below code reproduces Figures 2.1
+
+Cap_T = 0.5
+L = 10
+M = Cap_T*L
+M_star = M+1
+samp_number=500000
+h = seq(1,3.8,0.2)
+
+
+MOSUM_function = function(n){
+  
+  time_series = rnorm(L+n,0,1)
+  
+  myf = function(i){
+    sum((time_series[i:(i+L-1)]))
+  }
+  
+  normal_to_sum=sapply(c(1:n),myf)
+  return(normal_to_sum)
+}
+
+cl <- makeCluster(rep('localhost',3),type='SOCK')
+sample_cores = function(){
+  sample_matrix_third = matrix(0,nrow=ceiling(samp_number/3),ncol=M_star)
+  for (i in (1:(ceiling(samp_number/3)))){
+    temporary=MOSUM_function(M_star)
+    
+    for (j in (1:M_star)){
+      sample_matrix_third[i,j]=temporary[j]
+    }
+    
+  }
+  sample_matrix_third
+}
+clusterExport(cl,c('sample_cores','M_star','L','samp_number','MOSUM_function'))
+data1 = clusterEvalQ(cl,sample_cores())
+stopCluster(cl)
+sample_matrix = rbind(data1[[1]],data1[[2]],data1[[3]])
+
+
+
+Desired_values = rep(0,length(h))
+for (i in (1:length(h))){
+  Desired_values[i] = sum(apply(sample_matrix,1,function(x){any((x/(sqrt(L)  )>=h[i]))}))/samp_number
+}
+
+
+
+Z=Cap_T/(2-Cap_T)
+
+Diffusion_approximation = rep(0,length(h))
+for (i in (1:length(h))){
+  t1= (1/((2*pi)**0.5))*integrate(function(x){pnorm((h[i]*(Z+1)-x*(-Z+1))/(2*(Z**0.5)))*exp(-(x**2)/2)},-Inf,h[i])$value;
+  t2=((2/pi)**0.5)*((h[i]*Z*exp(-((h[i])**2)/2))/(Z+1))*pnorm(h[i]*((Z)**0.5)) 
+  t3=(((Z)**0.5)*exp((-((h[i])**2)/2)*(Z+1))/(pi*(Z+1)))
+  Diffusion_approximation[i]= 1 - t1 + t2 +t3
+}
+
+
+
+
+CDA= NULL
+
+for (h1 in (h)) {
+  rho = 0.583/sqrt(M*(1/Z))
+  Mprime=Z
+  
+  integrand = function(x){
+    
+    a = function(t){
+      (h1-t)/2 +rho 
+    }
+    
+    b = function(t){
+      (h1+t)/2
+    }
+    a = a(x)
+    b = b(x)
+    
+    (1 - pnorm((b*Mprime+a)/sqrt(Mprime)) + exp(-2*a*b)*pnorm((b*Mprime-a)/sqrt(Mprime)))*dnorm(x)
+  }
+  
+CDA = c(CDA,1+integrate(integrand,-37,h1)$value-pnorm(h1))
+  
+}
+
+
+Durbin_approx = ((h*Cap_T)/(((2*pi)**0.5)*Q))*exp(-(h**2)/2)
+
+
+lambda_b = h*dnorm(h)
+PCH_approx = 1-exp(-lambda_b*Cap_T)
+
+
+
+par(mar=c(5.1,5.1,4.1,2.1))
+plot(h,Desired_values,type='l',lwd=6,lty=2,ylab='',xlab='h',xaxt="n",yaxt='n',xaxs="i",yaxs="i",cex.axis=2.4,cex.lab=2.5)
+axis(1, at=h, cex.axis=2.5)
+axis(side = 2, tck = -.015, labels = NA)
+axis(side = 2, lwd = 0, line = 0.7, las = 1, cex.axis=2.5)
+lines(h,Diffusion_approximation,col='green')
+lines(h,CDA,col='blue',lwd=2)
+lines(h,Durbin_approx,col='red',lwd=2)
+lines(h,PCH_approx,col='purple',lwd=2)
+
+
+
+
+
+
+
+# The below code reproduces Figures 2.3
+
+Cap_T = 1
+L = 20
+M = Cap_T*L
+M_star = M+1
+samp_number=100000
+h = seq(1,3.8,0.2)
+
+
+MOSUM_function = function(n){
+  
+  time_series = rnorm(L+n,0,1)
+  
+  myf = function(i){
+    sum((time_series[i:(i+L-1)]))
+  }
+  
+  normal_to_sum=sapply(c(1:n),myf)
+  return(normal_to_sum)
+}
+
+cl <- makeCluster(rep('localhost',3),type='SOCK')
+sample_cores = function(){
+  sample_matrix_third = matrix(0,nrow=ceiling(samp_number/3),ncol=M_star)
+  for (i in (1:(ceiling(samp_number/3)))){
+    temporary=MOSUM_function(M_star)
+    
+    for (j in (1:M_star)){
+      sample_matrix_third[i,j]=temporary[j]
+    }
+    
+  }
+  sample_matrix_third
+}
+clusterExport(cl,c('sample_cores','M_star','L','samp_number','MOSUM_function'))
+data1 = clusterEvalQ(cl,sample_cores())
+stopCluster(cl)
+sample_matrix = rbind(data1[[1]],data1[[2]],data1[[3]])
+
+
+
+Desired_values = rep(0,length(h))
+for (i in (1:length(h))){
+  Desired_values[i] = sum(apply(sample_matrix,1,function(x){any((x/(sqrt(L)  )>=h[i]))}))/samp_number
+}
+
+
+plot(h,Desired_values,type='l',xlim=c(1,3.8),ylab='',xlab='h',lty=2,xaxt="n",yaxt='n',lwd=7,xaxs="i",yaxs="i",cex.axis=2.4,cex.lab=2.5)
+axis(1, at=seq(1,3.8,0.4), cex.axis=2.5)
+axis(side = 2, tck = -.015, labels = NA)
+axis(side = 2, lwd = 0, line = 0.7, las = 1, cex.axis=2.5)
+
+
+
+### Corrected shepp to be used if T=1
+
+CSA_1 = NULL
+for (h in seq(1,4,0.1)){
+  h1 = h+0.583*sqrt(2)/sqrt(L)
+  CSA_1=c(CSA_1,1-pnorm(h)*pnorm(h1) +dnorm(h1)*(h*pnorm(h)+dnorm(h)))
+}
+lines(seq(1,4,0.1),CSA_1,col=2,lwd=3,lty=1)
+
+
+
+### Corrected shepp to be used if T=2
+
+
+CSA_2 = NULL
+for (h in seq(1,4,0.1)){
+  
+  h1 = h+0.583*sqrt(2)/sqrt(L)
+  
+  f_test = function(x){
+    f_testy = function(y2){
+      
+      M = matrix(0,3,3)
+      M[1,1] = dnorm(x)
+      M[1,2] = dnorm(h1-y2)
+      M[1,3] = pnorm(h1-y2)
+      
+      M[2,1] = dnorm(h1)
+      M[2,2] = dnorm(2*h1-x-y2)
+      M[2,3] = pnorm(2*h1-x-y2)
+      
+      M[3,1] = dnorm(y2+x)
+      M[3,2] = dnorm(h1)
+      M[3,3] = pnorm(h1)
+      det(M)
+    }
+    f_testy = Vectorize(f_testy)
+    integrate(f_testy,h1-x,Inf)$value
+  }
+  f_test = Vectorize(f_test)
+  F2_c = integrate(f_test,-Inf,h)$value
+  
+  CSA_2=c(CSA_2,1-F2_c)
+}
+
+lines(seq(1,4,0.1),CSA_2,col=2,lwd=3,lty=1)
+
+
+
+# The below code reproduces Figures 2.6
+
+Cap_T = 1
+L = 20
+M = Cap_T*L
+M_star = M+1
+samp_number=100000
+h = seq(1,3.8,0.2)
+
+
+MOSUM_function = function(n){
+  
+  time_series = rnorm(L+n,0,1)
+  
+  myf = function(i){
+    sum((time_series[i:(i+L-1)]))
+  }
+  
+  normal_to_sum=sapply(c(1:n),myf)
+  return(normal_to_sum)
+}
+
+cl <- makeCluster(rep('localhost',3),type='SOCK')
+sample_cores = function(){
+  sample_matrix_third = matrix(0,nrow=ceiling(samp_number/3),ncol=M_star)
+  for (i in (1:(ceiling(samp_number/3)))){
+    temporary=MOSUM_function(M_star)
+    
+    for (j in (1:M_star)){
+      sample_matrix_third[i,j]=temporary[j]
+    }
+    
+  }
+  sample_matrix_third
+}
+clusterExport(cl,c('sample_cores','M_star','L','samp_number','MOSUM_function'))
+data1 = clusterEvalQ(cl,sample_cores())
+stopCluster(cl)
+sample_matrix = rbind(data1[[1]],data1[[2]],data1[[3]])
+
+
+
+Desired_values = rep(0,length(h))
+for (i in (1:length(h))){
+  Desired_values[i] = sum(apply(sample_matrix,1,function(x){any((x/(sqrt(L)  )>=h[i]))}))/samp_number
+}
+
+
+plot(h,Desired_values,type='l',xlim=c(1,3.8),ylab='',xlab='h',lty=2,xaxt="n",yaxt='n',lwd=7,xaxs="i",yaxs="i",cex.axis=2.4,cex.lab=2.5)
+axis(1, at=seq(1,3.8,0.4), cex.axis=2.5)
+axis(side = 2, tck = -.015, labels = NA)
+axis(side = 2, lwd = 0, line = 0.7, las = 1, cex.axis=2.5)
+
+
+### GSSA approximation
+h=seq(1,4,0.1)
+
+GSSA = NULL
+for (h1 in h) {
+  
+  hL = h1+0.583*sqrt(2)/sqrt(L)
+  
+  F1 = pnorm(h1)*pnorm(hL) - dnorm(hL)*(h1*pnorm(h1)+dnorm(h1)  )
+  
+  int1 = function(y){
+    
+    pnorm(h1-y)*(dnorm(hL+y)*pnorm(hL-y)-sqrt(pi)*dnorm(hL)^2*pnorm(sqrt(2)*y)  )
+    
+  }
+  int1=Vectorize(int1)
+  
+  F2 = (dnorm(hL)^2/2)*( (h1^2-1+sqrt(pi)*h1)*pnorm(h1)+(h1+sqrt(pi))*dnorm(h1)) - dnorm(hL)*pnorm(hL)*( (h1+hL)*pnorm(h1)+dnorm(h1)  ) + pnorm(h1)*pnorm(hL)^2+integrate(int1,0,Inf)$value  
+  
+  GSSA = c(GSSA,1-F2*(F2/F1 )^(Cap_T-2) )
+}
+
+lines(h,GSSA,col='blue',lwd=2)
+
+
+
+## Approximations 8 and 9
+
+Approximation8 = NULL
+Approximation9 = NULL
+
+for (h in seq(1,4,0.1)){
+
+  
+  ### Approximation 8
+  
+  h1 = h+0.583*sqrt(2)/sqrt(L)
+  
+  F1_c = pnorm(h)*pnorm(h1)-dnorm(h1)*(h*pnorm(h)+dnorm(h))
+  
+  N=100
+  b=h+(0.583*sqrt(2)/(sqrt(L)))
+  a=-20
+  time = gauss.quad(N,kind="legendre",-1,1)$nodes
+  weights = gauss.quad(N,kind="legendre",-1,1)$weights
+  weights = (b-a)/2 * weights
+  
+  h1=h+(0.583*sqrt(2)/(sqrt(L)))
+  
+  
+  kernel= function(z,x){
+    
+    dnorm(z)*(1-exp(-(h1-z)*(h1-x)))
+  }
+  
+  
+  D_sqrt = diag(sqrt(weights))
+  
+  K = matrix(0,nrow=N,ncol=N)
+  
+  for (i in (1:N)){
+    for (j in (1:N)){
+      K[i,j]=kernel(((b-a)/2)*time[i] + (b+a)/2,((b-a)/2)*time[j] + (b+a)/2)
+      
+    }
+    
+  }
+  
+  lam1_c= max(Re(eigs(D_sqrt%*%K%*%D_sqrt,6,opts = list(retvec = FALSE))$values))
+  
+  
+  Approximation8=c(Approximation8,1-F1_c*lam1_c^(Cap_T-1))
+  
+  
+  
+  
+  
+  #### Approximation 9
+  
+  
+  h1 = h+0.583*sqrt(2)/sqrt(L)
+  
+  f_test = function(x){
+    f_testy = function(y2){
+      
+      M = matrix(0,3,3)
+      M[1,1] = dnorm(x)
+      M[1,2] = dnorm(h1-y2)
+      M[1,3] = pnorm(h1-y2)
+      
+      M[2,1] = dnorm(h1)
+      M[2,2] = dnorm(2*h1-x-y2)
+      M[2,3] = pnorm(2*h1-x-y2)
+      
+      M[3,1] = dnorm(y2+x)
+      M[3,2] = dnorm(h1)
+      M[3,3] = pnorm(h1)
+      det(M)
+    }
+    f_testy = Vectorize(f_testy)
+    integrate(f_testy,h1-x,Inf)$value
+  }
+  f_test = Vectorize(f_test)
+  F2_c = integrate(f_test,-Inf,h)$value
+  
+  
+  N=100
+  b=h+(0.583*sqrt(2)/(sqrt(L)))
+  a=-20
+  time = gauss.quad(N,kind="legendre",-1,1)$nodes
+  weights = gauss.quad(N,kind="legendre",-1,1)$weights
+  weights = (b-a)/2 * weights
+  
+  h1=h+(0.583*sqrt(2)/(sqrt(L)))
+  first_form =function(z){
+    dnorm(z)*pnorm(h)-dnorm(h1)*pnorm(h-h1+z)
+    
+  }
+  
+  first_form=Vectorize(first_form)
+  
+  
+  kernel= function(z,x){
+    
+    
+    
+    M = matrix(0,3,3)
+    M[1,1] = pnorm(h)
+    M[1,2] = pnorm(h-h1+x)
+    M[1,3] = pnorm(h-2*h1+x+z)
+    
+    M[2,1] = dnorm(h1)
+    M[2,2] = dnorm(x)
+    M[2,3] = dnorm(x+z-h1)
+    
+    M[3,1] = dnorm(2*h1-x)
+    M[3,2] = dnorm(h1)
+    M[3,3] = dnorm(z)
+    
+    det(M)/(first_form(x))
+  }
+  
+  
+  D_sqrt = diag(sqrt(weights))
+  
+  K = matrix(0,nrow=N,ncol=N)
+  
+  for (i in (1:N)){
+    for (j in (1:N)){
+      K[i,j]=kernel(((b-a)/2)*time[i] + (b+a)/2,((b-a)/2)*time[j] + (b+a)/2)
+      
+    }
+    
+  }
+  
+  lam2_c = max(Re(eigs(D_sqrt%*%K%*%D_sqrt,6,opts = list(retvec = FALSE))$values))
+  
+  
+  
+  Approximation9=c(Approximation9,1-F2_c*lam2_c^(Cap_T-2))
+  
+  
+
+  print(h)
+  
+  
+}
+
+
+lines(seq(1,4,0.1),Approximation8,col='green',lwd=3)
+lines(seq(1,4,0.1),Approximation9,col='red',lwd=3)
+
+
+# The below code reproduces Table 2.6 and 2.7
+### ARL approximation
+
+L=10
+ARL_approx = NULL
+for (h in seq(2,3.5,0.25)){
+  
+  h1 = h+0.583*sqrt(2)/sqrt(L)
+  
+  F1_c = pnorm(h)*pnorm(h1)-dnorm(h1)*(h*pnorm(h)+dnorm(h))
+  
+  f_test = function(x){
+    f_testy = function(y2){
+      
+      M = matrix(0,3,3)
+      M[1,1] = dnorm(x)
+      M[1,2] = dnorm(h1-y2)
+      M[1,3] = pnorm(h1-y2)
+      
+      M[2,1] = dnorm(h1)
+      M[2,2] = dnorm(2*h1-x-y2)
+      M[2,3] = pnorm(2*h1-x-y2)
+      
+      M[3,1] = dnorm(y2+x)
+      M[3,2] = dnorm(h1)
+      M[3,3] = pnorm(h1)
+      det(M)
+    }
+    f_testy = Vectorize(f_testy)
+    integrate(f_testy,h1-x,Inf)$value
+  }
+  f_test = Vectorize(f_test)
+  F2_c = integrate(f_test,-Inf,h)$value
+  
+  theta = F2_c/F1_c
+  
+  
+  
+  ARL_approx=c(ARL_approx, -L*F2_c/( theta^2*log( theta)))
+}
+ARL_approx
+
+
+
+### ARL from Monte Carlo
+
+
+L=10
+h=2.5
+samp_num = 100000
+
+
+ARL_function = function(x){
+  average_track_multi = NULL
+  for (k in (1:round(x/8))) {
+    
+    time_series = rnorm(L,0,1)
+    
+    ARL_sum = NULL
+    ARL_sum =c(ARL_sum,sum(time_series)/sqrt(L))
+    i=1
+    j=1
+    while (any(ARL_sum>=h) == FALSE){
+      time_series = c(time_series[(i+1):length(time_series)],rnorm(1,0,1))
+      ARL_sum =c(ARL_sum,sum(time_series)/sqrt(L))
+      j=j+1
+      
+      
+    }
+    average_track_multi=c(average_track_multi,j)
+    print(k)
+  }
+  average_track_multi
+}
+cl <- makeCluster(rep('localhost',number_of_cores),type='SOCK')
+sample_cores = function(){
+  ARL_function(samp_num)
+}
+clusterExport(cl,c('ARL_function','samp_num','sample_cores','L','h'))
+data1 = clusterEvalQ(cl,sample_cores())
+stopCluster(cl)
+ARL_MC = unlist(data1)
+#ARL output
+mean(ARL_MC)
+
+
+
+
+
+
+############################################
+#### Code for main results of Chapter 3 ####
+############################################
+
+
+# The below code reproduces Figure 3.2 (a). The remaining tables and figures can be computed using below, or directly from the paper.
+
+# {1-p2(infinity)}/{1-p1(infinity)}
+p2_track = NULL
+
+for (h in seq(0,4,0.1)){
+  f_of_S2 = function(S2){
+    
+    
+    f_of_x = function(x){
+      
+      
+      f_of_S1 = function(S1){
+        
+        M = matrix(0,3,3)
+        M[1,1] = dnorm(x)
+        M[1,2] = dnorm(x-h+S1)
+        M[1,3] = dnorm(x-2*h+S1+S2)
+        M[2,1] = dnorm(h)
+        M[2,2] = dnorm(S1)
+        M[2,3] = dnorm(S1+S2-h)
+        M[3,1] = dnorm(2*h-S1)
+        M[3,2] = dnorm(h)
+        M[3,3] = dnorm(S2)
+        det(M)
+        
+        
+        
+      }
+      
+      f_of_S1=Vectorize( f_of_S1)
+      integrate( f_of_S1,-Inf,h,rel.tol=1e-10)$value
+      
+    }
+    
+    
+    f_of_x =Vectorize( f_of_x )
+    integrate( f_of_x,-Inf,h,rel.tol=1e-10)$value
+    
+    
+    
+  }
+  
+  f_of_S2=Vectorize(f_of_S2)
+  p2_track=c(p2_track,integrate(f_of_S2,-Inf,h,rel.tol=1e-10)$value)
+  print(h)
+}
+
+
+
+p1_track = NULL
+
+for (h in  seq(0,4,0.1)){
+  
+  cc = pnorm(h)^2 - dnorm(h)*(h*pnorm(h)+dnorm(h))
+  
+  
+  p1_track=c(p1_track,cc)
+  print(h)
+}
+
+
+
+# {1-p2(x0)}/{1-p1(x0)}
+
+
+p2_track_2 = NULL
+
+for (h in  seq(0,4,0.1)){
+  f_of_S2 = function(S2){
+    
+    
+    x=-dnorm(h)/pnorm(h)
+    
+    
+    f_of_S1 = function(S1){
+      
+      M = matrix(0,3,3)
+      M[1,1] = dnorm(x)
+      M[1,2] = dnorm(x-h+S1)
+      M[1,3] = dnorm(x-2*h+S1+S2)
+      M[2,1] = dnorm(h)
+      M[2,2] = dnorm(S1)
+      M[2,3] = dnorm(S1+S2-h)
+      M[3,1] = dnorm(2*h-S1)
+      M[3,2] = dnorm(h)
+      M[3,3] = dnorm(S2)
+      det(M)/dnorm(x)
+      
+      
+      
+    }
+    
+    f_of_S1=Vectorize( f_of_S1)
+    integrate( f_of_S1,-Inf,h,rel.tol = 1e-5)$value
+    
+    
+    
+    
+    
+    
+  }
+  
+  f_of_S2=Vectorize(f_of_S2)
+  p2_track_2=c(p2_track_2,integrate(f_of_S2,-Inf,h,rel.tol = 1e-5)$value)
+  print(h)
+}
+
+
+p1_track_2 = NULL
+
+for (h in  seq(0,4,0.1)){
+  
+  
+  x=-dnorm(h)/pnorm(h)
+  p_tild = function(k){
+    
+    
+    dnorm(k)*(1-exp(-(h-k)*(h-x)))
+    
+    
+  }  
+  
+  
+  p_tild = Vectorize(p_tild)
+  cc = integrate(p_tild,-20,h,rel.tol = 1e-5)$value
+  
+  
+  
+  
+  
+  p1_track_2=c(p1_track_2,cc)
+  print(h)
+}
+
+
+# {1-p3(infinty)}/{1-p2(infinity)}
+
+lambda_3 = NULL
+
+for (h in seq(0,4,0.1)){
+  
+  p1 = function(x){
+    y1=h-x
+    p1_y = function(y2){
+      
+      p3_y = function(y3){
+        
+        
+        M1 = matrix(0,4,4)
+        M1[1,1] = dnorm(h-y1)
+        M1[1,2] = dnorm(h-y2)
+        M1[1,3] = dnorm(h-y3)
+        M1[1,4] = pnorm(h-y3)
+        
+        M1[2,1] = dnorm(2*h-x-y1)
+        M1[2,2] = dnorm(2*h-x-y2)
+        M1[2,3] = dnorm(2*h-x-y3)
+        M1[2,4] = pnorm(2*h-y3-x)
+        
+        
+        
+        M1[3,1] = dnorm(h+y2-y1)
+        M1[3,2] = dnorm(h)
+        M1[3,3] = dnorm(h+y2-y3)
+        M1[3,4] = pnorm(h-y3+y2)
+        
+        M1[4,1] = dnorm(h+y3-y1)
+        M1[4,2] = dnorm(h+y3-y2)
+        M1[4,3] = dnorm(h)
+        M1[4,4] = pnorm(h)
+        
+        det(M1)
+  
+      }
+
+      p3_y = Vectorize(p3_y)
+      integrate(p3_y,y2,Inf,rel.tol=1e-10)$value
+    }
+    p1_y = Vectorize(p1_y)
+    integrate(p1_y,h-x,Inf,rel.tol=1e-10)$value
+    
+    
+  }
+  p1=Vectorize(p1)
+  
+  
+  dd = integrate(p1,-Inf,h,rel.tol=1e-10)
+  
+
+  f_of_S2 = function(S2){
+    f_of_x = function(x){
+      f_of_S1 = function(S1){
+        
+        M = matrix(0,3,3)
+        M[1,1] = dnorm(x)
+        M[1,2] = dnorm(x-h+S1)
+        M[1,3] = dnorm(x-2*h+S1+S2)
+        M[2,1] = dnorm(h)
+        M[2,2] = dnorm(S1)
+        M[2,3] = dnorm(S1+S2-h)
+        M[3,1] = dnorm(2*h-S1)
+        M[3,2] = dnorm(h)
+        M[3,3] = dnorm(S2)
+        det(M)
+      
+        
+      }
+      
+      f_of_S1=Vectorize( f_of_S1)
+      integrate( f_of_S1,-Inf,h,rel.tol=1e-10)$value
+      
+    }
+    
+    
+    f_of_x =Vectorize( f_of_x )
+    integrate( f_of_x,-Inf,h,rel.tol=1e-10)$value
+
+  }
+  
+  f_of_S2=Vectorize(f_of_S2)
+  lambda_3 = c(lambda_3,dd$value/integrate(f_of_S2,-Inf,h,rel.tol=1e-10)$value)
+
+  print(lambda_3)
+  
+}
+
+
+# {1-p3(0)}/{1-p2(0)}
+
+
+p3_track_zero=NULL
+
+for (h in  seq(0,4,0.1)){
+  
+  x=-dnorm(h)/pnorm(h)
+  p1_y = function(y2){
+    
+    y1=h-x
+    p3_y = function(y3){
+      
+      
+      M1 = matrix(0,4,4)
+      M1[1,1] = dnorm(h-y1)
+      M1[1,2] = dnorm(h-y2)
+      M1[1,3] = dnorm(h-y3)
+      M1[1,4] = pnorm(h-y3)
+      
+      M1[2,1] = dnorm(2*h-x-y1)
+      M1[2,2] = dnorm(2*h-x-y2)
+      M1[2,3] = dnorm(2*h-x-y3)
+      M1[2,4] = pnorm(2*h-y3-x)
+
+      M1[3,1] = dnorm(h+y2-y1)
+      M1[3,2] = dnorm(h)
+      M1[3,3] = dnorm(h+y2-y3)
+      M1[3,4] = pnorm(h-y3+y2)
+      
+      M1[4,1] = dnorm(h+y3-y1)
+      M1[4,2] = dnorm(h+y3-y2)
+      M1[4,3] = dnorm(h)
+      M1[4,4] = pnorm(h)
+      
+
+      det(M1)/dnorm(x)
+    }
+    p3_y = Vectorize(p3_y)
+    integrate(p3_y,y2,Inf,rel.tol = 1e-5)$value
+  }
+  p1_y = Vectorize(p1_y)
+  
+  
+  dd =  integrate(p1_y,h-x,Inf,rel.tol = 1e-5)$value
+
+  f_of_S2 = function(S2){
+    
+    x=-dnorm(h)/pnorm(h)
+
+    
+    f_of_S1 = function(S1){
+      
+      M = matrix(0,3,3)
+      M[1,1] = dnorm(x)
+      M[1,2] = dnorm(x-h+S1)
+      M[1,3] = dnorm(x-2*h+S1+S2)
+      M[2,1] = dnorm(h)
+      M[2,2] = dnorm(S1)
+      M[2,3] = dnorm(S1+S2-h)
+      M[3,1] = dnorm(2*h-S1)
+      M[3,2] = dnorm(h)
+      M[3,3] = dnorm(S2)
+      det(M)/dnorm(x)
+
+      
+    }
+    
+    f_of_S1=Vectorize( f_of_S1)
+    integrate( f_of_S1,-Inf,h,rel.tol = 1e-5)$value
+
+  }
+  
+  f_of_S2=Vectorize(f_of_S2)
+  
+  
+  p3_track_zero = c(p3_track_zero,dd/integrate(f_of_S2,-Inf,h,rel.tol = 1e-5)$value)
+  print(h)
+  print(p3_track_zero)
+}
+
+
+# {1-p4(infinty)}/{1-p3(infinity)}
+
+
+lambda_4 = NULL
+
+for (h in seq(0,4,0.1)){
+  
+  p1 = function(x){
+    y1=h-x
+    p1_y = function(y2){
+      
+      p3_y = function(y3){
+        p4_y = function(y4){
+          
+          
+          M1 = matrix(0,5,5)
+          M1[1,1] = dnorm(h-y1)
+          M1[1,2] = dnorm(h-y2)
+          M1[1,3] = dnorm(h-y3)
+          M1[1,4] = dnorm(h-y4)
+          M1[1,5] = pnorm(h-y4)
+          
+          M1[2,1] = dnorm(2*h-x-y1)
+          M1[2,2] = dnorm(2*h-x-y2)
+          M1[2,3] = dnorm(2*h-x-y3)
+          M1[2,4] = dnorm(y1-y4+h)
+          M1[2,5] = pnorm(h+y1-y4)
+
+          M1[3,1] = dnorm(h+y2-y1)
+          M1[3,2] = dnorm(h)
+          M1[3,3] = dnorm(h+y2-y3)
+          M1[3,4] = dnorm(h+y2-y4)
+          M1[3,5] = pnorm(h+y2-y4)
+          
+          M1[4,1] = dnorm(h+y3-y1)
+          M1[4,2] = dnorm(h+y3-y2)
+          M1[4,3] = dnorm(h)
+          M1[4,4] = dnorm(y3-y4+h)
+          M1[4,5] = pnorm(h+y3-y4)
+          
+          M1[5,1] = dnorm(y4-y1+h)
+          M1[5,2] = dnorm(y4-y2+h)
+          M1[5,3] = dnorm(y4-y3+h)
+          M1[5,4] = dnorm(h)
+          M1[5,5] = pnorm(h)
+
+          
+          det(M1)
+
+        }
+        p4_y = Vectorize(p4_y)
+        integrate(p4_y,y3,Inf,rel.tol=1e-10)$value
+      }
+      
+      p3_y = Vectorize(p3_y)
+      integrate(p3_y,y2,Inf,rel.tol=1e-10)$value
+    }
+    p1_y = Vectorize(p1_y)
+    integrate(p1_y,h-x,Inf,rel.tol=1e-10)$value
+    
+  }
+  p1=Vectorize(p1)
+  
+  
+  dd = integrate(p1,-Inf,h,rel.tol = 1e-10)$value
+  
+  
+  p33 = function(x){
+    y1=h-x
+    p1_y = function(y2){
+      
+      p3_y = function(y3){
+        
+        
+        M1 = matrix(0,4,4)
+        M1[1,1] = dnorm(h-y1)
+        M1[1,2] = dnorm(h-y2)
+        M1[1,3] = dnorm(h-y3)
+        M1[1,4] = pnorm(h-y3)
+        
+        M1[2,1] = dnorm(2*h-x-y1)
+        M1[2,2] = dnorm(2*h-x-y2)
+        M1[2,3] = dnorm(2*h-x-y3)
+        M1[2,4] = pnorm(2*h-y3-x)
+ 
+        M1[3,1] = dnorm(h+y2-y1)
+        M1[3,2] = dnorm(h)
+        M1[3,3] = dnorm(h+y2-y3)
+        M1[3,4] = pnorm(h-y3+y2)
+        
+        M1[4,1] = dnorm(h+y3-y1)
+        M1[4,2] = dnorm(h+y3-y2)
+        M1[4,3] = dnorm(h)
+        M1[4,4] = pnorm(h)
+        
+        det(M1)
+        
+      }
+      
+      p3_y = Vectorize(p3_y)
+      integrate(p3_y,y2,Inf,rel.tol=1e-10)$value
+    }
+    p1_y = Vectorize(p1_y)
+    integrate(p1_y,h-x,Inf,rel.tol=1e-10)$value
+    
+  }
+  p33=Vectorize(p33)
+  
+  
+  dd33 = integrate(p33,-Inf,h,rel.tol=1e-10)$value
+
+  lambda_4 = c(lambda_4,dd/dd33)
+  
+  print(h)
+  
+}
+
+#{1-p4(infinty)}/{1-p3(infinity)} at h=0 only
+
+h=0
+
+part_0 = function(s0){
+  
+  part_1 = function(s1){
+    part_2 = function(s2){
+      part_3 = function(s3){
+        part_4 = function(s4){
+          
+          M = matrix(0,6,6)
+          M[1,1] = dnorm(s0)
+          M[2,1] = dnorm(h)
+          M[3,1] = dnorm(2*h-s1)
+          M[4,1] = dnorm(3*h-s1-s2)
+          M[5,1] = dnorm(4*h-s1-s2-s3)
+          M[6,1] = dnorm(5*h-s1-s2-s3-s4)
+          
+          M[1,2] = dnorm(-h+s0+s1)
+          M[2,2] = dnorm(s1)
+          M[3,2] = dnorm(h)
+          M[4,2] = dnorm(2*h-s2)
+          M[5,2] = dnorm(3*h-s2-s3)
+          M[6,2] = dnorm(4*h-s2-s3-s4)
+          
+          M[1,3] = dnorm(-2*h+s0+s1+s2)
+          M[2,3] = dnorm(-h+s1+s2)
+          M[3,3] = dnorm(s2)
+          M[4,3] = dnorm(h)
+          M[5,3] = dnorm(2*h-s3)
+          M[6,3] = dnorm(3*h-s3-s4)
+          
+          M[1,4] = dnorm(-3*h+s0+s1+s2+s3)
+          M[2,4] = dnorm(-2*h+s1+s2+s3)
+          M[3,4] = dnorm(-h+s2+s3)
+          M[4,4] = dnorm(s3)
+          M[5,4] = dnorm(h)
+          M[6,4] = dnorm(2*h-s4)
+          
+          M[1,5] = dnorm(-4*h+s0+s1+s2+s3+s4)
+          M[2,5] = dnorm(-3*h+s1+s2+s3+s4)
+          M[3,5] = dnorm(-2*h+s2+s3+s4)
+          M[4,5] = dnorm(-h+s3+s4)
+          M[5,5] = dnorm(s3)
+          M[6,5] = dnorm(h)
+          
+          M[1,6] = pnorm(-4*h+s0+s1+s2+s3+s4)
+          M[2,6] = pnorm(-3*h+s1+s2+s3+s4)
+          M[3,6] = pnorm(-2*h+s2+s3+s4)
+          M[4,6] = pnorm(-h+s3+s4)
+          M[5,6] = pnorm(s4)
+          M[6,6] = pnorm(h)
+          
+          det(M)
+          
+        }
+        
+        part_4=Vectorize(part_4)
+        integrate(part_4,-Inf,h,rel.tol=1e-10)$value
+        
+      }
+      part_3 = Vectorize(part_3)
+      integrate(part_3,-Inf,h,rel.tol=1e-10)$value
+      
+    }
+    part_2 = Vectorize(part_2)
+    integrate(part_2,-Inf,h,rel.tol=1e-10)$value
+    
+  }
+  
+  part_1 = Vectorize(part_1)
+  integrate(part_1,-Inf,h,rel.tol=1e-10)$value
+  
+}
+part_0 = Vectorize(part_0)
+num = integrate(part_0,-Inf,h,rel.tol=1e-10)$value
+
+
+h=0
+p1 = function(x){
+  y1=h-x
+  p1_y = function(y2){
+    
+    p3_y = function(y3){
+      p4_y = function(y4){
+        
+        
+        M1 = matrix(0,5,5)
+        M1[1,1] = dnorm(h-y1)
+        M1[1,2] = dnorm(h-y2)
+        M1[1,3] = dnorm(h-y3)
+        M1[1,4] = dnorm(h-y4)
+        M1[1,5] = pnorm(h-y4)
+        
+        M1[2,1] = dnorm(2*h-x-y1)
+        M1[2,2] = dnorm(2*h-x-y2)
+        M1[2,3] = dnorm(2*h-x-y3)
+        M1[2,4] = dnorm(y1-y4+h)
+        M1[2,5] = pnorm(h+y1-y4)
+        
+        M1[3,1] = dnorm(h+y2-y1)
+        M1[3,2] = dnorm(h)
+        M1[3,3] = dnorm(h+y2-y3)
+        M1[3,4] = dnorm(h+y2-y4)
+        M1[3,5] = pnorm(h+y2-y4)
+        
+        M1[4,1] = dnorm(h+y3-y1)
+        M1[4,2] = dnorm(h+y3-y2)
+        M1[4,3] = dnorm(h)
+        M1[4,4] = dnorm(y3-y4+h)
+        M1[4,5] = pnorm(h+y3-y4)
+        
+        M1[5,1] = dnorm(y4-y1+h)
+        M1[5,2] = dnorm(y4-y2+h)
+        M1[5,3] = dnorm(y4-y3+h)
+        M1[5,4] = dnorm(h)
+        M1[5,5] = pnorm(h)
+        
+        det(M1)
+        
+      }
+      p4_y = Vectorize(p4_y)
+      integrate(p4_y,y3,Inf,rel.tol=1e-10)$value
+    }
+    
+    p3_y = Vectorize(p3_y)
+    integrate(p3_y,y2,Inf,rel.tol=1e-10)$value
+  }
+  p1_y = Vectorize(p1_y)
+  integrate(p1_y,h-x,Inf,rel.tol=1e-10)$value
+  
+  
+}
+p1=Vectorize(p1)
+
+
+dd = integrate(p1,-Inf,h,rel.tol = 1e-10)$value
+
+
+# {1-p4(0)}/{1-p3(0)}
+
+lambda_4_zero = NULL
+
+for (h in  seq(0,4,0.1)){
+  
+  x=-dnorm(h)/pnorm(h)
+  y1=h-x
+  p1_y = function(y2){
+    
+    p3_y = function(y3){
+      p4_y = function(y4){
+        
+        
+        M1 = matrix(0,5,5)
+        M1[1,1] = dnorm(h-y1)
+        M1[1,2] = dnorm(h-y2)
+        M1[1,3] = dnorm(h-y3)
+        M1[1,4] = dnorm(h-y4)
+        M1[1,5] = pnorm(h-y4)
+        
+        M1[2,1] = dnorm(2*h-x-y1)
+        M1[2,2] = dnorm(2*h-x-y2)
+        M1[2,3] = dnorm(2*h-x-y3)
+        M1[2,4] = dnorm(y1-y4+h)
+        M1[2,5] = pnorm(h+y1-y4)
+        
+        M1[3,1] = dnorm(h+y2-y1)
+        M1[3,2] = dnorm(h)
+        M1[3,3] = dnorm(h+y2-y3)
+        M1[3,4] = dnorm(h+y2-y4)
+        M1[3,5] = pnorm(h+y2-y4)
+        
+        M1[4,1] = dnorm(h+y3-y1)
+        M1[4,2] = dnorm(h+y3-y2)
+        M1[4,3] = dnorm(h)
+        M1[4,4] = dnorm(y3-y4+h)
+        M1[4,5] = pnorm(h+y3-y4)
+        
+        M1[5,1] = dnorm(y4-y1+h)
+        M1[5,2] = dnorm(y4-y2+h)
+        M1[5,3] = dnorm(y4-y3+h)
+        M1[5,4] = dnorm(h)
+        M1[5,5] = pnorm(h)
+        
+        det(M1)/dnorm(x)
+
+        
+      }
+      p4_y = Vectorize(p4_y)
+      integrate(p4_y,y3,Inf,rel.tol=1e-10)$value
+    }
+
+    p3_y = Vectorize(p3_y)
+    integrate(p3_y,y2,Inf,rel.tol=1e-10)$value
+  }
+  p1_y = Vectorize(p1_y)
+  dd=integrate(p1_y,h-x,Inf,rel.tol=1e-10)$value
+  
+  
+  y1=h-x
+  p1_y = function(y2){
+    
+    p3_y = function(y3){
+      
+      
+      M1 = matrix(0,4,4)
+      M1[1,1] = dnorm(h-y1)
+      M1[1,2] = dnorm(h-y2)
+      M1[1,3] = dnorm(h-y3)
+      M1[1,4] = pnorm(h-y3)
+      
+      M1[2,1] = dnorm(2*h-x-y1)
+      M1[2,2] = dnorm(2*h-x-y2)
+      M1[2,3] = dnorm(2*h-x-y3)
+      M1[2,4] = pnorm(2*h-y3-x)
+      
+      
+      
+      M1[3,1] = dnorm(h+y2-y1)
+      M1[3,2] = dnorm(h)
+      M1[3,3] = dnorm(h+y2-y3)
+      M1[3,4] = pnorm(h-y3+y2)
+      
+      M1[4,1] = dnorm(h+y3-y1)
+      M1[4,2] = dnorm(h+y3-y2)
+      M1[4,3] = dnorm(h)
+      M1[4,4] = pnorm(h)
+
+      
+      det(M1)/dnorm(x)
+
+    }
+    
+    p3_y = Vectorize(p3_y)
+    integrate(p3_y,y2,Inf,rel.tol=1e-10)$value
+  }
+  p1_y = Vectorize(p1_y)
+  dd33=integrate(p1_y,h-x,Inf,rel.tol=1e-10)$value
+  
+  lambda_4_zero = c(lambda_4_zero,dd/dd33)
+  
+  print(lambda_4_zero)
+  
+}
+
+
+
+#### Lambda from GAUSS Legendre
+
+
+
+lambda_2_GL = NULL
+for (k in  seq(0,4,0.1)){
+  N=100
+  b=k
+  a=-20
+  time = gauss.quad(N,kind="legendre",-1,1)$nodes
+  weights = gauss.quad(N,kind="legendre",-1,1)$weights
+  weights = (b-a)/2 * weights
+  
+  h=k
+  
+  kernel= function(s2,x){
+
+    (1/(sqrt(3*2*pi)))*pnorm((1/sqrt(3))*(x-h+s2))*( exp(-s2^2/3 + (1/3)*(x-h)*s2 + x^2/6 - h*x/3 - h^2/3   )   - exp(x^2/6 + (2/3)*(h-s2)*x - (h-s2)^2/3 - h^2) ) - dnorm(s2)*pnorm(x)*exp(x^2/2-h^2/2) + pnorm(h)*dnorm(s2) + (1/sqrt(2*pi))*exp(x^2/2 - h^2)*pnorm(x-h+s2) - pnorm(s2)*dnorm(h)
+    
+  }
+  
+  
+  D_sqrt = diag(sqrt(weights))
+  
+  K = matrix(0,nrow=N,ncol=N)
+  
+  for (i in (1:N)){
+    for (j in (1:N)){
+      K[i,j]=kernel(((b-a)/2)*time[i] + (b+a)/2,((b-a)/2)*time[j] + (b+a)/2)
+      
+    }
+  }
+
+  lambda_2_GL = c(lambda_2_GL, max(Re(eigs(D_sqrt%*%K%*%D_sqrt,6,opts = list(retvec = FALSE))$values)))
+  print(k)
+}
+
+
+
+
+lambda_1_GL = NULL
+for (k in  seq(0,4,0.1)){
+  N=100
+  b=k
+  a=-10
+  time = gauss.quad(N,kind="legendre",-1,1)$nodes
+  weights = gauss.quad(N,kind="legendre",-1,1)$weights
+  weights = (b-a)/2 * weights
+
+  kernel= function(x,y){
+    ((1/sqrt(2*pi))*exp(-(x^2)/2)*(1-exp(-(k-x)*(k-y) )))
+    
+  }
+  
+  D_sqrt = diag(sqrt(weights))
+  
+  K = matrix(0,nrow=N,ncol=N)
+  
+  for (i in (1:N)){
+    for (j in (1:N)){
+      K[i,j]=kernel(((b-a)/2)*time[i] + (b+a)/2,((b-a)/2)*time[j] + (b+a)/2)
+    }
+  }
+
+  lambda_1_GL = c(lambda_1_GL, max(Re(eigs(D_sqrt%*%K%*%D_sqrt,6,opts = list(retvec = FALSE))$values)))
+  print(k)
+}
+
+
+lambda_1_GL_approx = NULL
+for (h in  c(0.000001,seq(0.1,4,0.1))){
+  lambda_1_GL_approx=c(lambda_1_GL_approx,(pnorm(h) + dnorm(h)/h - dnorm(h)*(dnorm(h)+h*pnorm(h))/((pnorm(h)-exp(-h^2/2)/(2)))))
+}
+
+
+
+## Kernel from 1-2
+
+
+lambda_2_1_GL = NULL
+for (k in  seq(0,4,0.1)){
+  N=100
+  b=k
+  a=-20
+  time = gauss.quad(N,kind="legendre",-1,1)$nodes
+  weights = gauss.quad(N,kind="legendre",-1,1)$weights
+  weights = (b-a)/2 * weights
+  
+  h=k
+  
+  kernel = function(s2,s1){
+    
+    M = matrix(0,3,3)
+    M[1,1] = pnorm(h)
+    M[1,2] = pnorm(s1)
+    M[1,3] = pnorm(s1+s2-h)
+    M[2,1] = dnorm(h)
+    M[2,2] = dnorm(s1)
+    M[2,3] = dnorm(s1+s2-h)
+    M[3,1] = dnorm(2*h-s1)
+    M[3,2] = dnorm(h)
+    M[3,3] = dnorm(s2)
+  
+    p1 = function(s1){
+      pnorm(h)*dnorm(s1) - dnorm(h)*pnorm(s1)
+    }
+    det(M)/(p1(s1))
+  }
+
+  
+  D_sqrt = diag(sqrt(weights))
+  
+  K = matrix(0,nrow=N,ncol=N)
+  
+  for (i in (1:N)){
+    for (j in (1:N)){
+      K[i,j]=kernel(((b-a)/2)*time[i] + (b+a)/2,((b-a)/2)*time[j] + (b+a)/2)
+    }
+  }
+  
+  lambda_2_1_GL = c(lambda_2_1_GL, max(Re(eigs(D_sqrt%*%K%*%D_sqrt,6,opts = list(retvec = FALSE))$values)))
+  print(k)
+}
+
+
+PCH_lam = NULL
+for (h in seq(0,4,0.1)){
+  PCH_lam =c(PCH_lam,exp(-h*dnorm(h)))
+}
+
+### Relative error plots
+
+lambda_2 = p2_track/p1_track
+lambda_2_zero = p2_track_2/p1_track_2
+lambda_3_zero = p3_track_zero
+
+plot(seq(0,4,0.1),lambda_2/lambda_4-1,type='l',ylim=c(-0.01,0.01),xlim=c(0,4),lwd=4,lty=1,ylab='',xlab='h',cex.axis=1.5,cex.lab=2)
+lines(seq(0,4,0.1), lambda_2_zero/lambda_4-1,col='red',lwd=4)
+lines(seq(0,4,0.1), lambda_3_zero/lambda_4-1,col='green',lwd=4)
+lines(seq(0,4,0.1), lambda_4_zero/lambda_4-1,col='orange',lwd=4)
+lines(seq(0,4,0.1), ((lambda_1_GL_approx))/lambda_4-1,col='brown',lwd=4)
+lines(seq(0,4,0.1), ((PCH_lam))/lambda_4-1,col='grey',lwd=4)
+lines(seq(0,4,0.1), ((lambda_2_1_GL))/lambda_4-1,col='cyan',lwd=4)
+
+
+
+
+
+
+############################################
+#### Code for main results of Chapter 4 ####
+############################################
+
+
+
+### The below code can be used to reproduce Table 4.1
+
+h=3.83
+gamma = function(x){
+  
+  p1 = function(x2){
+    
+    p2 = function(x3){
+      
+      M=matrix(0,4,4)
+      
+      M[1,1]= dnorm(x)
+      M[1,2]= dnorm(-x2-h)
+      M[1,3]= dnorm(-x3-2*h+mu)
+      M[1,4]= pnorm(-x3-2*h+mu)
+      
+      M[2,1]= dnorm(h)
+      M[2,2]= dnorm(-x-x2)
+      M[2,3]= dnorm(-x-x3-h+mu)
+      M[2,4]= pnorm(-x-x3-h+mu)
+      
+      M[3,1]= dnorm(x2+2*h+x)
+      M[3,2]= dnorm(h)
+      M[3,3]= dnorm(x2-x3+mu)
+      M[3,4]= pnorm(x2-x3+mu)
+      
+      M[4,1]= dnorm(x3+3*h-mu+x)
+      M[4,2]= dnorm(x3+2*h-mu-x2)
+      M[4,3]= dnorm(h)
+      M[4,4]= pnorm(h)
+      
+      exp(-mu*(x3-x2))*det(M)
+      
+    }
+    p2=Vectorize(p2)
+    integrate(p2,x2-h+mu,Inf,rel.tol = 10^-10)$value
+    
+  }
+  p1=Vectorize(p1)
+  num = exp(mu^2/2)*integrate(p1,-x-h,Inf,rel.tol = 10^-10)$value/dnorm(x)
+  
+  
+  
+  
+  denom = pnorm(h) - exp(-(h^2-x^2)/2 )*pnorm(x)
+  
+  
+  
+  1-num/denom
+  
+  
+  
+  
+  
+}
+
+out = matrix(0,length(seq(2,5,0.25)),1)
+
+for (i in seq(2,5,0.25)){
+  mu=i
+  out[which(i==seq(2,5,0.25)),]=gamma(0)
+}
+
+output0=round(out,3)
+
+
+
+gamma1 = function(x){
+  
+  p1 = function(x2){
+    
+    M = matrix(0,3,3)
+    
+    M[1,1] = dnorm(x)
+    M[1,2] = dnorm(-x2-h+mu)
+    M[1,3] = pnorm(-x2-h+mu)
+    
+    M[2,1] = dnorm(h)
+    M[2,2] = dnorm(-x-x2+mu)
+    M[2,3] = pnorm(-x-x2+mu)
+    
+    M[3,1] = dnorm(x2+2*h-mu+x)
+    M[3,2] = dnorm(h)
+    M[3,3] = pnorm(h)
+    
+    exp(-mu*x2)*det(M)
+    
+  }
+  
+  p1 = Vectorize(p1)
+  exp(mu^2/2-mu*x)*integrate(p1,-x-h+mu,Inf,rel.tol = 10^-10)$value/dnorm(x)
+  
+}
+
+
+out = matrix(0,length(seq(2,5,0.25)),1)
+
+for (i in seq(2,5,0.25)){
+  mu=i
+  out[which(i==seq(2,5,0.25)),]=1-gamma1(0)
+}
+
+
+output1=round(out,3)
+
+
+
+gamma3 = function(x){
+  
+  p1 = function(x2){
+    
+    p2 = function(x3){
+      M = matrix(0,3,3)
+      
+      M[1,1] = dnorm(x)
+      M[1,2] = dnorm(-x2-h)
+      M[1,3] = dnorm(-x3-2*h+mu)
+      
+      M[2,1] = dnorm(h)
+      M[2,2] = dnorm(-x-x2)
+      M[2,3] =dnorm(-x-x3-h+mu)
+
+      M[3,1] = dnorm(x2+2*h+x)
+      M[3,2] = dnorm(h)
+      M[3,3] = dnorm(x2-x3+mu)
+
+      exp(-mu*(x3-x2))*det(M)
+      
+    }
+    p2=Vectorize(p2)
+    integrate(p2,x2-h+mu,Inf,rel.tol =10^-10 )$value
+    
+  }
+  p1 = Vectorize(p1)
+  num=exp(mu^2/2)*integrate(p1,-x-h,Inf,rel.tol = 10^-10)$value/dnorm(x)
+  
+  denom = pnorm(h) - exp(-(h^2-x^2)/2 )*pnorm(x)
+  
+  1-num/denom
+  
+}
+
+
+out = matrix(0,length(seq(2,5,0.25)),1)
+
+for (i in seq(2,5,0.25)){
+  mu=i
+  out[which(i==seq(2,5,0.25)),]=gamma3(0)
+}
+
+output2=round(out,3)
+
+output = cbind(output0,output1,output2)
+output
+
+
+############################################
+#### Code for main results of Chapter 5 ####
+############################################
+
+# The below code reproduces Figure 5.11 (left)
+
+# 1<lambda<2 
+
+
+L=5
+h=3
+h_L = h+0.583*sqrt(2)/sqrt(L)
+
+
+theta=0.5
+
+p_1= function(x){
+  (pnorm(h_L)*dnorm(x)-dnorm(h_L)*pnorm(h_L-h_L+x))/(pnorm(h_L)*pnorm(h_L)-dnorm(h_L)*(h_L*pnorm(h_L)+dnorm(h_L)))
+}
+p_1 = Vectorize(p_1)
+
+Markov_approx = NULL
+for (gamma in seq(0,5,0.25) ){
+  integral1 = function(x0){
+    integral2 = function(x1){
+      integral3 = function(x2){
+        
+        a = (p_1(x0)/dnorm(x0))*exp(-gamma^2/2+gamma*(gamma+x1))*(dnorm(x0)*dnorm(x1+gamma)-dnorm(x0+x1-h_L+gamma)*dnorm(h_L)   )
+        b = (1/(sqrt(2*pi)*dnorm(x1)))*(dnorm(x2-x1,sd=sqrt(theta*(2-theta)))*exp(x2*x1/(theta-2)) -exp((h_L-gamma)*(x2+x1-(h_L-gamma))/theta)*dnorm(x2+x1,sd=sqrt(theta*(2-theta)))  ) 
+        c = pnorm(h_L)-exp( -((h_L-gamma)^2-x2^2 )/2 - gamma*((h_L-gamma)-x2))*pnorm(x2+gamma)
+        
+        a*b*c
+      }
+      integral3 = Vectorize(integral3)
+      integrate(integral3,-20,h_L-gamma)$value
+    }
+    integral2 = Vectorize(integral2)
+    integrate(integral2,-20,h_L-gamma)$value
+  }
+  integral1 = Vectorize(integral1)
+  Markov_approx=c(Markov_approx,1-integrate(integral1,-20,h)$value)
+  print(gamma)
+}
+
+Power_approx = Markov_approx
+
+
+### Monte Carlo simulations for power
+
+Barrier_function = function(t,h,gam,tau){
+  if (t<= (tau) ){
+    h
+  }
+  else if (t<=(tau+1)) {
+    h-gam*(t-tau)
+  }
+  else if (t<=(tau+1+theta)) {
+    h-gam
+  }
+  else {
+    h-gam+gam*(t-tau-(1+theta))
+  }
+}
+Barrier_function=Vectorize(Barrier_function)
+
+
+Cap_T = 6+theta
+samp_number=100000
+Tau = round(Cap_T*L)
+Tau_p1 = Tau
+
+
+sum_of_normal_and_squared = function(n){
+  time_series = rnorm(L+n,0,1)
+  myf = function(i){
+    sum((time_series[i:(i+L-1)]))
+  }
+  normal_to_sum=sapply(c(1:n),myf)
+  return(normal_to_sum)
+}
+
+
+cl <- makeCluster(rep('localhost',number_of_cores),type='SOCK')
+sample_cores = function(){
+  sample_matrix_third = matrix(0,nrow=ceiling(samp_number/8),ncol=Tau_p1)
+  for (i in (1:(ceiling(samp_number/8)))){
+    temp=sum_of_normal_and_squared(Tau_p1)
+    
+    for (j in (1:Tau_p1)){
+      sample_matrix_third[i,j]=temp[j]
+    }
+  }
+  sample_matrix_third
+}
+clusterExport(cl,c('sample_cores','Tau','Tau_p1','L','sum_of_normal_and_squared','samp_number'))
+data1 = clusterEvalQ(cl,sample_cores())
+stopCluster(cl)
+sample_matrix = rbind(data1[[1]],data1[[2]],data1[[3]],data1[[4]],data1[[5]],data1[[6]],data1[[7]],data1[[8]])
+sample_matrix= sample_matrix/sqrt(L)
+
+
+
+tau = 4
+continuous_time = seq(0,Cap_T,length.out = Tau_p1)
+index_track = NULL
+for (i in (1:samp_number)){
+  if (all(sample_matrix[i,c(1:(4*L+1))]<h)){
+    index_track = c(index_track,i)
+  }
+}
+sample_matrix2 = sample_matrix[index_track,]
+
+
+MC_simulations = NULL
+for (o in seq(0,5,0.25)){
+  barrier = Barrier_function(continuous_time,h,o,tau)
+  MC_simulations = c(MC_simulations,sum(apply(sample_matrix2,1,function(x){any((x>=barrier))}))/nrow(sample_matrix2))
+  
+}
+
+
+plot(seq(0,5,0.25),Power_approx,type='l',col='red',ylab='',xlab=expression(gamma),lwd=2,lty=1,cex.axis=2,cex.lab=3)
+lines(seq(0,5,0.25),MC_simulations,lty=2,lwd=5)
+
+
+
+
+# The below code reproduces Figure 5.11 (right)
+
+## Approx for lambda=2
+
+L=5
+h_L = h+0.583*sqrt(2)/sqrt(L)
+Power_approx = NULL
+for (gamma in seq(0,5,0.25)){
+  
+  part1 = function(x){
+    part2 = function(x2){
+      part3 = function(x3){
+        part4 = function(x4){
+          
+          M = matrix(0,5,5)
+          M[1,1] = dnorm(x)
+          M[1,2] = dnorm(-x2-h_L)
+          M[1,3] = dnorm(-x3-2*h_L+gamma)
+          M[1,4] = dnorm(-x4-3*h_L+2*gamma)
+          M[1,5] = pnorm(-x4-3*h_L+2*gamma)
+          
+          M[2,1] = dnorm(h_L)
+          M[2,2] = dnorm(-x-x2)
+          M[2,3] = dnorm(-x-x3-h_L+gamma)
+          M[2,4] = dnorm(-x-x4-2*h_L+2*gamma)
+          M[2,5] = pnorm(-x-x4-2*h_L+2*gamma)
+          
+          M[3,1] = dnorm(x2+2*h_L+x)
+          M[3,2] = dnorm(h_L)
+          M[3,3] = dnorm(x2-x3+gamma)
+          M[3,4] = dnorm(x2-x4-h_L+2*gamma)
+          M[3,5] = pnorm(x2-x4-h_L+2*gamma)
+          
+          M[4,1] = dnorm(x3+3*h_L-gamma+x)
+          M[4,2] = dnorm(x3+2*h_L-gamma-x2)
+          M[4,3] = dnorm(h_L)
+          M[4,4] = dnorm(x3-x4+gamma)
+          M[4,5] = pnorm(x3-x4+gamma)
+          
+          M[5,1] = dnorm(x4+4*h_L-2*gamma+x)
+          M[5,2] = dnorm(x4+3*h_L-2*gamma-x2)
+          M[5,3] = dnorm(x4+2*h_L-gamma-x3)
+          M[5,4] = dnorm(h_L)
+          M[5,5] = pnorm(h_L)
+          
+          
+          det(M)*exp(gamma^2)*exp(-gamma*(x4-x2))/dnorm(x)
+          
+          
+        }
+        part4 = Vectorize(part4)
+        integrate(part4,x3-h_L+gamma,Inf)$value
+      }
+      part3 = Vectorize(part3)
+      integrate(part3,x2-h_L+gamma,Inf)$value
+    }
+    part2 = Vectorize(part2)
+    integrate(part2,-x-h_L,Inf)$value
+  }
+  
+  part1 = Vectorize(part1)
+  
+  
+  Power_approx=c(Power_approx,1-part1(0)/(pnorm(h_L)-exp(-(h_L^2)/2)*pnorm(0)))
+  print(gamma)
+}
+
+
+theta=1
+
+Barrier_function = function(t,h,gam,tau){
+  if (t<= (tau) ){
+    h
+  }
+  else if (t<=(tau+1)) {
+    h-gam*(t-tau)
+  }
+  else if (t<=(tau+1+theta)) {
+    h-gam
+  }
+  else {
+    h-gam+gam*(t-tau-(1+theta))
+  }
+}
+Barrier_function=Vectorize(Barrier_function)
+
+tau = 4
+continuous_time = seq(0,Cap_T,length.out = Tau_p1)
+index_track = NULL
+for (i in (1:samp_number)){
+  if (all(sample_matrix[i,c(1:(4*L+1))]<h)){
+    index_track = c(index_track,i)
+  }
+}
+sample_matrix2 = sample_matrix[index_track,]
+
+
+MC_simulations = NULL
+for (o in seq(0,5,0.25)){
+  barrier = Barrier_function(continuous_time,h,o,tau)
+  MC_simulations= c(MC_simulations,sum(apply(sample_matrix2,1,function(x){any((x>=barrier))}))/nrow(sample_matrix2))
+  
+}
+
+
+plot(seq(0,5,0.25),Power_approx,type='l',col='red',ylab='',xlab=expression(gamma),lwd=2,lty=1,cex.axis=2,cex.lab=3)
+lines(seq(0,5,0.25),MC_simulations,lty=2,lwd=5)
+
+
+
+# The below code reproduces Figure 5.14
+# 1>lambda 
+
+lambda=0.75
+L=5
+h=3
+h_L = h+0.583*sqrt(2)/sqrt(L)
+
+
+p_1= function(x){
+  (pnorm(h_L)*dnorm(x)-dnorm(h_L)*pnorm(h_L-h_L+x))/(pnorm(h_L)*pnorm(h_L)-dnorm(h_L)*(h_L*pnorm(h_L)+dnorm(h_L)))
+}
+p_1 = Vectorize(p_1)
+
+trans = function(a,b,t,x,s){
+  (1/(sqrt(2*pi)*dnorm(x)) )*( exp(s*x/(t-2))*dnorm(s-x,sd=sqrt(t*(2-t)))-exp(b*(x-a)+a*(s+x-a)/t)*dnorm(s+x,sd=sqrt(t*(2-t)))   )
+  
+}
+
+
+
+Markov_approx = NULL
+for (gamma in seq(0,5,0.25) ){
+  integral1 = function(s0){
+    integral2 = function(s1){
+      integral3 = function(s2){
+        
+        p_1(s0)*trans(h_L,-gamma,lambda,s0,s1)*trans(h_L-gamma*lambda,0,1-lambda,s1,s2)*integrate(trans,-15,h_L,a=h_L-gamma*lambda,b=gamma,t=lambda,x=s2)$value
+        
+      }
+      integral3 = Vectorize(integral3)
+      integrate(integral3,-10,h_L-gamma*lambda)$value
+    }
+    integral2 = Vectorize(integral2)
+    integrate(integral2,-10,h_L-gamma*lambda)$value
+  }
+  integral1 = Vectorize(integral1)
+  Markov_approx=c(Markov_approx,1-integrate(integral1,-10,h)$value)
+  print(gamma)
+  
+}
+Power_approx = Markov_approx
+
+Barrier_function = function(t,h,gam,tau){
+  if (t<= (tau) ){
+    h
+  }
+  else if (t<=(tau+lambda)) {
+    h-gam*(t-tau)
+  }
+  else if (t<=(tau+1)) {
+    h-gam*lambda
+  }
+  else {
+    h-gam*lambda+gam*(t-tau-(1))
+  }
+}
+Barrier_function=Vectorize(Barrier_function)
+
+
+Cap_T = 5+lambda
+samp_number=100000
+Tau = round(Cap_T*L)
+Tau_p1 = Tau
+
+
+sum_of_normal_and_squared = function(n){
+  time_series = rnorm(L+n,0,1)
+  myf = function(i){
+    sum((time_series[i:(i+L-1)]))
+  }
+  normal_to_sum=sapply(c(1:n),myf)
+  return(normal_to_sum)
+}
+
+
+cl <- makeCluster(rep('localhost',number_of_cores),type='SOCK')
+sample_cores = function(){
+  sample_matrix_third = matrix(0,nrow=ceiling(samp_number/8),ncol=Tau_p1)
+  for (i in (1:(ceiling(samp_number/8)))){
+    temp=sum_of_normal_and_squared(Tau_p1)
+    
+    for (j in (1:Tau_p1)){
+      sample_matrix_third[i,j]=temp[j]
+    }
+  }
+  sample_matrix_third
+}
+clusterExport(cl,c('sample_cores','Tau','Tau_p1','L','sum_of_normal_and_squared','samp_number'))
+data1 = clusterEvalQ(cl,sample_cores())
+stopCluster(cl)
+sample_matrix = rbind(data1[[1]],data1[[2]],data1[[3]],data1[[4]],data1[[5]],data1[[6]],data1[[7]],data1[[8]])
+sample_matrix= sample_matrix/sqrt(L)
+
+
+tau = 4
+
+continuous_time = seq(0,Cap_T,length.out = Tau_p1 )
+index_track = NULL
+for (i in (1:samp_number)){
+  if (all(sample_matrix[i,c(1:(4*L+1))]<h)){
+    index_track = c(index_track,i)
+  }
+}
+
+sample_matrix2 = sample_matrix[index_track,]
+
+
+MC_simulations = NULL
+
+for (o in seq(0,5,0.25)){
+  barrier = Barrier_function(continuous_time,h,o,tau)
+  MC_simulations = c(MC_simulations,sum(apply(sample_matrix2,1,function(x){any((x>=barrier))}))/nrow(sample_matrix2))
+  
+}
+
+plot(seq(0,5,0.25),Power_approx,type='l',col='red',ylab='',xlab=expression(gamma),lwd=2,lty=1,cex.axis=2,cex.lab=3)
+lines(seq(0,5,0.25),MC_simulations,lty=2,lwd=5)
+
+
+# The below code reproduces Figure 5.6
+
+#### lambda=1
+
+h=4
+L=5
+
+power = function(a,z,x){
+  b=0
+  bp = z
+  
+  p_x = function(x){
+    p_x2  = function(x2){
+      p_x3 = function(x3){
+        
+        M = matrix(0,4,4)
+        M[1,1] = dnorm(x)
+        M[1,2] = dnorm(-a-x2)
+        M[1,3] = dnorm(-2*a+bp-x3)
+        M[1,4] = dnorm(-x3-2*a+bp)
+        
+        M[2,1] = dnorm(a)
+        M[2,2] = dnorm(-x-x2)
+        M[2,3] = dnorm(-x-a+bp-x3)
+        M[2,4] = pnorm(-x-a+bp-x3)
+        
+        M[3,1] = dnorm(x2+2*a+x)
+        M[3,2] = dnorm(a)
+        M[3,3] = dnorm(x2+bp-x3)
+        M[3,4] = pnorm(x2+bp-x3)
+        
+        M[4,1] = dnorm(x3+3*a-bp+x)
+        M[4,2] = dnorm(x3+2*a-bp-x2)
+        M[4,3] = dnorm(a)
+        M[4,4] = pnorm(a)
+        
+        
+        exp(0.5*(bp^2) -bp*(x3-x2))*det(M)/dnorm(x)
+      }
+      
+      p_x3 = Vectorize(p_x3)
+      integrate(p_x3,x2-a+bp,Inf,rel.tol=10e-10)$value
+    }
+    p_x2 = Vectorize(p_x2)
+    integrate(p_x2,-x-a,Inf,rel.tol=10e-10)$value
+  }
+  
+  con = function(x){
+    p_x(x)/(pnorm(a)-exp(-(a^2-x^2)/2)*pnorm(x)  )
+  }
+  1-con(x)
+}
+power=Vectorize(power)
+Power_approx = round(power(h+0.583*sqrt(2)/sqrt(L),seq(0,5,0.25),0),3)
+
+Barrier_function = function(t,h,gam,tau){
+  if (t<= (tau) ){
+    h
+  }
+  else if (t<=(tau+1)) {
+    h-gam*(t-tau)
+  }
+  else if (t<=(tau+1)) {
+    h-gam
+  }
+  else {
+    h-gam+gam*(t-tau-(1))
+  }
+}
+Barrier_function=Vectorize(Barrier_function)
+
+
+Cap_T = 6
+samp_number=100000
+Tau = round(Cap_T*L)
+Tau_p1 = Tau
+
+sum_of_normal_and_squared = function(n){
+  time_series = rnorm(L+n,0,1)
+  myf = function(i){
+    sum((time_series[i:(i+L-1)]))
+  }
+  normal_to_sum=sapply(c(1:n),myf)
+  return(normal_to_sum)
+}
+
+
+cl <- makeCluster(rep('localhost',number_of_cores),type='SOCK')
+sample_cores = function(){
+  sample_matrix_third = matrix(0,nrow=ceiling(samp_number/number_of_cores),ncol=Tau_p1)
+  for (i in (1:(ceiling(samp_number/number_of_cores)))){
+    temp=sum_of_normal_and_squared(Tau_p1)
+    
+    for (j in (1:Tau_p1)){
+      sample_matrix_third[i,j]=temp[j]
+    }
+  }
+  sample_matrix_third
+}
+clusterExport(cl,c('sample_cores','Tau','Tau_p1','L','sum_of_normal_and_squared','samp_number','number_of_cores'))
+data1 = clusterEvalQ(cl,sample_cores())
+stopCluster(cl)
+sample_matrix = rbind(data1[[1]],data1[[2]],data1[[3]],data1[[4]],data1[[5]],data1[[6]],data1[[7]],data1[[8]])
+sample_matrix= sample_matrix/sqrt(L)
+
+
+tau = 4
+continuous_time = seq(0,Cap_T,length.out = Tau_p1 )
+
+Desired_values = c(0)
+index_track = NULL
+for (i in (1:samp_number)){
+  if (all(sample_matrix[i,c(1:(4*L+1))]<h)){
+    index_track = c(index_track,i)
+  }
+}
+
+sample_matrix2 = sample_matrix[index_track,]
+
+
+MC_simulations = NULL
+
+for (o in seq(0,5,0.25)){
+  barrier = Barrier_function(continuous_time,h,o,tau)
+  MC_simulations = c(MC_simulations,sum(apply(sample_matrix2,1,function(x){any((x>=barrier))}))/nrow(sample_matrix2))
+  
+}
+
+
+plot(seq(0,5,0.25),Power_approx,type='l',col='red',ylab='',xlab=expression(gamma),lwd=2,lty=1,cex.axis=2,cex.lab=3)
+lines(seq(0,5,0.25),MC_simulations,lty=2,lwd=5)
+
+
+
+
+############################################
+#### Code for main results of Chapter 7 ####
+############################################
+
+
+############################################
+#### Weak covering ####
+############################################
+
+# Depending on the scheme of interest,  the below code will reproduce Figures 7.17 -- 7.30. The values in tables for weak covering
+# can also be obtained with the following Monte carlo simulations.
+
+
+
+###############################
+## Scheme 1 - in the cube
+###############################
+
+mean_track = NULL
+
+d=20
+n=128
+r_seq=2.4
+delta_seq=seq(0.1,1,0.1)
+samp_num=10000
+
+multi_core = function(samp_num,d,n,r,v){
+  
+  Results = matrix(0,nrow=length(r_seq),ncol=length(delta_seq))
+  for (r in r_seq){
+    for (v in delta_seq){
+      
+      M = matrix(0,nrow=n,ncol=d)
+      
+      for (i in (1:n)){
+        M[i,] =  runif(d,-v,v)
+      }
+      
+      
+      M1 = matrix(0,samp_num,d)
+      
+      for (i in (1:samp_num)){
+        M1[i,] = runif(d,-1,1)
+      }
+      
+      In_circle = function(x,y,r){
+        
+        if (sqrt( sum((x-y)^2) )<=r ){
+          1
+        }
+        else{0}
+      }
+      
+      output=0
+      for (i in (1:samp_num)){
+        In_one_circle = 0
+        for (j in c(1:n)){
+          In_one_circle=In_one_circle+ In_circle(M1[i,],M[j,],r)
+        }
+        if (In_one_circle>0){
+          output=output+1
+        }
+      }
+      
+      Results[which(r==r_seq),which(v==delta_seq)]=  Results[which(r==r_seq),which(v==delta_seq)]+output
+    }
+  }
+  Results
+}
+
+cl <- makeCluster(rep('localhost',6),type='SOCK')
+sample_cores = function(){
+  multi_core(samp_num=samp_num,d=d,n=n,r =r,v=v)
+}
+clusterExport(cl,c('multi_core','sample_cores','samp_num','d','n','r_seq','delta_seq'))
+data1 = clusterEvalQ(cl,sample_cores())
+stopCluster(cl)
+Results_matrix = (data1[[1]]+data1[[2]]+data1[[3]]+data1[[4]]+data1[[5]]+data1[[6]])/(samp_num*6)
+
+mean_track = c(mean_track,Results_matrix)
+mean(mean_track)
+
+plot(delta_seq,Results_matrix[1,],type='l',ylim=c(0,1),cex.main=2,cex.lab=2,cex.axis=1.5,col='green',axes=FALSE,xlab='',ylab='')
+axis(1, mgp=c(3, 1.2, 0),cex.axis=2)
+axis(2, mgp=c(3, 1.2, 0),cex.axis=2)
+mtext(side=3, text=expression(bold("Scheme 1: d=10")), line=0.8,cex=2,font.lab=2)
+box(lty = 1, col = 'black')
+par(mar=c(5.1,6.2,4.1,2.1))
+mtext(side=1, text='delta', line=3.2,cex=2)
+mtext(side=2, text="Probability", line=3.2,cex=2)
+
+
+
+## Approximation with CLT
+
+r = r_seq
+approx = function(delta){
+  int = function(t){
+    exp(-n*pnorm( (3*(r/(delta) )^2-(1/(delta^2))*(d+2*t*sqrt(d/5))-d)/(2*sqrt(1/(delta^2)*(d+2*t*sqrt(d/5))+d/5  )) ))*dnorm(t)
+  }
+  int = Vectorize(int)
+  1-  integrate(int,-3,3)$value
+}
+
+approx = Vectorize(approx)
+lines(seq(0.01,1,length.out = 20), approx(seq(0.01,1,length.out = 20)),col='blue',lwd=3,lty=2)
+
+
+
+## Improved CLT approximation
+
+approx = function(delta){
+  
+  
+  int = function(t){
+    x= ((r/delta)^2 - t/delta^2 - d/3  )/(2*sqrt(t/(3*delta^2)+d/45 ))
+    exp(-n*( pnorm(x )  + (1+4/d)*((16/15)*(t/(delta^2)+d/63 )*(1-x^2)*dnorm(x)/(6*((4/3)*(t/delta^2 +d/15))^(3/2) ))      )      )*dnorm(t,d/3,sd=sqrt(4*d/45))
+  }
+  
+  int = Vectorize(int)
+  1-  integrate(int,0.1,100)$value
+}
+approx = Vectorize(approx)
+lines(seq(0.01,1,length.out = 20), approx(seq(0.01,1,length.out = 20)),col='green',lwd=3,lty=5)
+
+
+###############################
+### Scheme 2 - In cube with zero
+###############################
+
+d=50
+n=128
+r_seq=4.13
+delta_seq=seq(0,1,0.04)
+samp_num=2000
+
+multi_core = function(samp_num,d,n,r,v){
+  
+  Results = matrix(0,nrow=length(r_seq),ncol=length(delta_seq))
+  for (r in r_seq){
+    for (v in delta_seq){
+      M = matrix(0,nrow=n,ncol=d)
+      M[1,] = rep(0,d)
+      for (i in (2:n)){
+        M[i,] =  runif(d,-v,v)
+      }
+      M1 = matrix(0,samp_num,d)
+      
+      for (i in (1:samp_num)){
+        M1[i,] = runif(d,-1,1)
+      }
+      
+      In_circle = function(x,y,r){
+        
+        if (sqrt( sum((x-y)^2) )<=r ){
+          1
+        }
+        else{0}
+      }
+      
+      output=0
+      for (i in (1:samp_num)){
+        In_one_circle = 0
+        for (j in c(1:n)){
+          In_one_circle=In_one_circle+ In_circle(M1[i,],M[j,],r)
+        }
+        if (In_one_circle>0){
+          output=output+1
+        }
+      }
+      
+      Results[which(r==r_seq),which(v==delta_seq)]=  Results[which(r==r_seq),which(v==delta_seq)]+output
+    }
+  }
+  Results
+}
+
+
+
+
+
+cl <- makeCluster(rep('localhost',6),type='SOCK')
+
+sample_cores = function(){
+  multi_core(samp_num=samp_num,d=d,n=n,r =r,v=v)
+}
+clusterExport(cl,c('multi_core','sample_cores','samp_num','d','n','r_seq','delta_seq'))
+data1 = clusterEvalQ(cl,sample_cores())
+stopCluster(cl)
+Results_matrix = (data1[[1]]+data1[[2]]+data1[[3]]+data1[[4]]+data1[[5]]+data1[[6]])/(samp_num*6)
+
+
+plot(delta_seq,Results_matrix[1,],type='l',ylim=c(0,1),cex.main=2,cex.lab=2,cex.axis=1.5,col='green',axes=FALSE,xlab='',ylab='')
+#text(0.1,1,'r=1.68',cex = 2)
+axis(1, mgp=c(3, 1.2, 0),cex.axis=2)
+axis(2, mgp=c(3, 1.2, 0),cex.axis=2)
+mtext(side=3, text=expression(bold("Scheme 2: d=20, n=500")), line=0.8,cex=2,font.lab=2)
+box(lty = 1, col = 'black')
+par(mar=c(5.1,6.2,4.1,2.1))
+mtext(side=1, text='delta', line=3.2,cex=2)
+mtext(side=2, text="Probability", line=3.2,cex=2)
+for (i in 1:nrow(Results_matrix)){
+  lines(delta_seq,Results_matrix[i,],col=i)
+}
+
+
+###############################
+## Scheme 3
+###############################
+
+
+
+d=6
+n=2^(d)
+A = FrF2:: FrF2(n,d)
+A=as.matrix(A)
+A = matrix(as.numeric(A),nrow=n,ncol=d)
+samp_num=10000
+r_seq =1.270793
+delta_seq=seq(0,1,0.04)
+
+
+multi_core = function(samp_num,d,n,r,v){
+  
+  Results = matrix(0,nrow=length(r_seq),ncol=length(delta_seq))
+  for (r in r_seq){
+    for (v in delta_seq){
+
+      n1 = n
+      M = matrix(0,n1,d)
+      
+      for (i in (1:n)){
+        
+        M[i,] =  v*(A[i,])
+      }
+
+      M1 = matrix(0,samp_num,d)
+      
+      
+      for (i in (1:samp_num)){
+        M1[i,] = runif(d,-1,1)
+      }
+      
+      In_circle = function(x,y,r){
+        
+        if (sqrt( sum((x-y)^2) )<=r ){
+          1
+        }
+        else{0}
+      }
+      
+      
+      output=0
+      for (i in (1:samp_num)){
+        In_one_circle = 0
+        for (j in c(1:n1)){
+          In_one_circle=In_one_circle+ In_circle(M1[i,],M[j,],r)
+        }
+        if (In_one_circle>0){
+          output=output+1
+        }
+        
+      }
+      
+      Results[which(r==r_seq),which(v==delta_seq)]=  Results[which(r==r_seq),which(v==delta_seq)]+output
+    }
+  }
+  Results
+}
+
+
+
+
+
+cl <- makeCluster(rep('localhost',6),type='SOCK')
+
+sample_cores = function(){
+  multi_core(samp_num=samp_num,d=d,n=n,r =r,v=v) }
+clusterExport(cl,c('multi_core','sample_cores','samp_num','d','n','r_seq','delta_seq','A'))
+data1 = clusterEvalQ(cl,sample_cores())
+stopCluster(cl)
+Results_matrix = (data1[[1]]+data1[[2]]+data1[[3]]+data1[[4]]+data1[[5]]+data1[[6]])/(samp_num*6)
+
+
+plot(delta_seq,Results_matrix,type='l',ylim=c(0,1),cex.main=2,cex.lab=2,cex.axis=1.5,col='green',axes=FALSE,xlab='',ylab='',lwd=3)
+axis(1, mgp=c(3, 1.8, 0),cex.axis=3)
+axis(2, mgp=c(3, 1.2, 0),cex.axis=3)
+mtext(side=3, text=expression(bold("Scheme 3: d=10")), line=0.8,cex=3,font.lab=2)
+box(lty = 1, col = 'black')
+par(mar=c(5.1,7.2,4.1,2.1))
+mtext(side=1, text=expression(paste(delta)), line=4,cex=4)
+mtext(side=2, text="", line=3.5,cex=2)
+#abline(v=0.44,lwd=3,col='green',lty=1)
+abline(h=0.9,lwd=3)
+
+
+
+###############################
+## Scheme 4
+###############################
+
+d=50
+n=1024
+alpha=1.5
+r_seq= 3.97
+delta_seq=seq(0,1,0.04)
+samp_num=200
+
+multi_core = function(samp_num,d,n,r,v){
+  
+  Results = matrix(0,nrow=length(r_seq),ncol=length(delta_seq))
+  for (r in r_seq){
+    for (v in delta_seq){
+      
+      M = matrix(0,nrow=n,ncol=d)
+      
+      for (i in (1:n)){
+        M[i,] =  v*(2*rbeta(d,alpha,alpha)-1)
+      }
+      
+      
+      M1 = matrix(0,samp_num,d)
+      
+      for (i in (1:samp_num)){
+        M1[i,] = runif(d,-1,1)
+      }
+      
+      In_circle = function(x,y,r){
+        
+        if (sqrt( sum((x-y)^2) )<=r ){
+          1
+        }
+        else{0}
+      }
+      
+      output=0
+      for (i in (1:samp_num)){
+        In_one_circle = 0
+        for (j in c(1:n)){
+          In_one_circle=In_one_circle+ In_circle(M1[i,],M[j,],r)
+        }
+        if (In_one_circle>0){
+          output=output+1
+        }
+      }
+      
+      Results[which(r==r_seq),which(v==delta_seq)]=  Results[which(r==r_seq),which(v==delta_seq)]+output
+    }
+  }
+  Results
+}
+
+
+cl <- makeCluster(rep('localhost',6),type='SOCK')
+
+sample_cores = function(){
+  multi_core(samp_num=samp_num,d=d,n=n,r =r,v=v)
+}
+clusterExport(cl,c('multi_core','sample_cores','samp_num','d','n','r_seq','delta_seq','alpha'))
+data1 = clusterEvalQ(cl,sample_cores())
+stopCluster(cl)
+Results_matrix = (data1[[1]]+data1[[2]]+data1[[3]]+data1[[4]]+data1[[5]]+data1[[6]])/(samp_num*6)
+
+
+
+plot(delta_seq,Results_matrix[1,],type='l',ylim=c(0,1),cex.main=2,cex.lab=2,cex.axis=1.5,col='green',axes=FALSE,xlab='',ylab='')
+axis(1, mgp=c(3, 1.2, 0),cex.axis=2)
+axis(2, mgp=c(3, 1.2, 0),cex.axis=2)
+mtext(side=3, text=expression(bold("Scheme 4: d=10, alpha=0.5")), line=0.8,cex=2,font.lab=2)
+box(lty = 1, col = 'black')
+par(mar=c(5.1,6.2,4.1,2.1))
+mtext(side=1, text='delta', line=3.2,cex=2)
+mtext(side=2, text="Probability", line=3.2,cex=2)
+
+
+
+###############################
+## Scheme 5 - On the ball
+###############################
+
+d=50
+n=1024
+r_seq=3.97
+v_seq=seq(0,3.5,0.25)
+samp_num=200
+
+
+multi_core = function(samp_num,d,n,r,v){
+  
+  Results = matrix(0,nrow=length(r_seq),ncol=length(v_seq))
+  for (r in r_seq){
+    for (v in v_seq){
+      
+      M = matrix(0,nrow=n,ncol=d)
+      
+      for (i in (1:n)){
+        R = runif(1,0,1)^(1/d)
+        z = rnorm(d,0,1)
+        M[i,] =  v*R*(z/sqrt(sum(z^2)))
+      }
+      
+      M1 = matrix(0,samp_num,d)
+      
+      for (i in (1:samp_num)){
+        M1[i,] = runif(d,-1,1)
+      }
+      
+      In_circle = function(x,y,r){
+        
+        if (sqrt( sum((x-y)^2) )<=r ){
+          1
+        }
+        else{0}
+      }
+      
+      
+      output=0
+      for (i in (1:samp_num)){
+        In_one_circle = 0
+        for (j in c(1:n)){
+          In_one_circle=In_one_circle+ In_circle(M1[i,],M[j,],r)
+        }
+        if (In_one_circle>0){
+          output=output+1
+        }
+      }
+      
+      Results[which(r==r_seq),which(v==v_seq)]=  Results[which(r==r_seq),which(v==v_seq)]+output
+    }
+  }
+  Results
+}
+
+
+cl <- makeCluster(rep('localhost',6),type='SOCK')
+
+sample_cores = function(){
+  multi_core(samp_num=samp_num,d=d,n=n,r =r,v=v)
+}
+clusterExport(cl,c('multi_core','sample_cores','samp_num','d','n','r_seq','v_seq'))
+data1 = clusterEvalQ(cl,sample_cores())
+stopCluster(cl)
+Results_matrix = (data1[[1]]+data1[[2]]+data1[[3]]+data1[[4]]+data1[[5]]+data1[[6]])/(samp_num*6)
+
+
+plot(v_seq,Results_matrix[1,],type='l',ylim=c(0,1),cex.main=2,cex.lab=2,cex.axis=1.5,col='green',axes=FALSE,xlab='',ylab='')
+axis(1, mgp=c(3, 1.2, 0),cex.axis=2)
+axis(2, mgp=c(3, 1.2, 0),cex.axis=2)
+mtext(side=3, text=expression(bold("Scheme 5: d=20, n=128")), line=0.8,cex=2,font.lab=2)
+box(lty = 1, col = 'black')
+par(mar=c(5.1,6.2,4.1,2.1))
+mtext(side=1, text='delta', line=3.2,cex=2)
+mtext(side=2, text="Probability", line=3.2,cex=2)
+
+
+
+
+###############################
+## Scheme 6
+###############################
+
+
+d=50
+n=128
+r_seq=4.13
+v_seq=seq(0,3.5,0.25)
+samp_num=200
+number_of_cores=6
+
+
+multi_core = function(samp_num,d,n,r,v){
+  
+  Results = matrix(0,nrow=length(r_seq),ncol=length(v_seq))
+  for (r in r_seq){
+    for (v in v_seq){
+      
+      M = matrix(0,nrow=n,ncol=d)
+      
+      for (i in (1:n)){
+        z = rnorm(d,0,1)
+        M[i,] = v*(z/sqrt(sum(z^2)))
+      }
+      
+      M1 = matrix(0,samp_num,d)
+      
+      for (i in (1:samp_num)){
+        M1[i,] = runif(d,-1,1)
+      }
+      In_circle = function(x,y,r){
+        
+        if (sqrt( sum((x-y)^2) )<=r ){
+          1
+        }
+        else{0}
+      }
+      output=0
+      for (i in (1:samp_num)){
+        In_one_circle = 0
+        for (j in c(1:n)){
+          In_one_circle=In_one_circle+ In_circle(M1[i,],M[j,],r)
+        }
+        if (In_one_circle>0){
+          output=output+1
+        }
+      }
+      
+      Results[which(r==r_seq),which(v==v_seq)]=  Results[which(r==r_seq),which(v==v_seq)]+output
+    }
+  }
+  Results
+}
+
+
+cl <- makeCluster(rep('localhost',6),type='SOCK')
+
+sample_cores = function(){
+  multi_core(samp_num=samp_num,d=d,n=n,r =r,v=v)
+}
+clusterExport(cl,c('multi_core','sample_cores','samp_num','d','n','r_seq','v_seq'))
+data1 = clusterEvalQ(cl,sample_cores())
+stopCluster(cl)
+Results_matrix = (data1[[1]]+data1[[2]]+data1[[3]]+data1[[4]]+data1[[5]]+data1[[6]])/(samp_num*6)
+
+
+plot(v_seq,Results_matrix[1,],type='l',ylim=c(0,1),cex.main=2,cex.lab=2,cex.axis=1.5,col='green',axes=FALSE,xlab='',ylab='')
+#text(0.1,1,'r=1.68',cex = 2)
+axis(1, mgp=c(3, 1.2, 0),cex.axis=2)
+axis(2, mgp=c(3, 1.2, 0),cex.axis=2)
+mtext(side=3, text=expression(bold("Scheme 6: d=100, n=1024")), line=0.8,cex=2,font.lab=2)
+box(lty = 1, col = 'black')
+par(mar=c(5.1,6.2,4.1,2.1))
+mtext(side=1, text='delta', line=3.2,cex=2)
+mtext(side=2, text="Probability", line=3.2,cex=2)
+
+
+
+
+###############################
+## Scheme 7
+###############################
+
+
+
+d=50
+n=1024
+r_seq= 4.366
+delta_seq=seq(0,1,0.1)
+samp_num=200
+
+multi_core = function(samp_num,d,n,r,v){
+  
+  Results = matrix(0,nrow=length(r_seq),ncol=length(delta_seq))
+  for (r in r_seq){
+    for (v in delta_seq){
+      
+      M = matrix(0,nrow=n,ncol=d)
+
+      M =  v*(2*sobolSequence.points(d, dimF2=10, count=n)-1)
+
+      M1 = matrix(0,samp_num,d)
+      
+      for (i in (1:samp_num)){
+        M1[i,] = runif(d,-1,1)
+      }
+      
+      In_circle = function(x,y,r){
+        
+        if (sqrt( sum((x-y)^2) )<=r ){
+          1
+        }
+        else{0}
+      }
+      
+      output=0
+      for (i in (1:samp_num)){
+        In_one_circle = 0
+        for (j in c(1:n)){
+          In_one_circle=In_one_circle+ In_circle(M1[i,],M[j,],r)
+        }
+        if (In_one_circle>0){
+          output=output+1
+        }
+      }
+      
+      Results[which(r==r_seq),which(v==delta_seq)]=  Results[which(r==r_seq),which(v==delta_seq)]+output
+    }
+  }
+  Results
+}
+
+
+cl <- makeCluster(rep('localhost',6),type='SOCK')
+
+sample_cores = function(){
+  multi_core(samp_num=samp_num,d=d,n=n,r =r,v=v)
+}
+clusterExport(cl,c('multi_core','sample_cores','samp_num','d','n','r_seq','delta_seq','sobolSequence.points'))
+data1 = clusterEvalQ(cl,sample_cores())
+stopCluster(cl)
+Results_matrix = (data1[[1]]+data1[[2]]+data1[[3]]+data1[[4]]+data1[[5]]+data1[[6]])/(samp_num*6)
+
+
+plot(delta_seq,Results_matrix[1,],type='l',ylim=c(0,1),cex.main=2,cex.lab=2,cex.axis=1.5,col='green',axes=FALSE,xlab='',ylab='')
+#text(0.1,1,'r=1.68',cex = 2)
+axis(1, mgp=c(3, 1.2, 0),cex.axis=2)
+axis(2, mgp=c(3, 1.2, 0),cex.axis=2)
+mtext(side=3, text=expression(bold("Scheme 1: d=10")), line=0.8,cex=2,font.lab=2)
+box(lty = 1, col = 'black')
+par(mar=c(5.1,6.2,4.1,2.1))
+mtext(side=1, text='delta', line=3.2,cex=2)
+mtext(side=2, text="Probability", line=3.2,cex=2)
+
+
+
+###############################
+#### Covering a cube by cubes
+###############################
+
+# The below code will reproduce Figures 7.31 and 7.32
+
+d=10
+n=512
+r_seq= seq(0.65,0.8,0.05)
+delta_seq=seq(0.05,1,0.05)
+samp_num=500
+
+multi_core = function(samp_num,d,n,r,v){
+  
+  Results = matrix(0,nrow=length(r_seq),ncol=length(delta_seq))
+  for (r in r_seq){
+    for (v in delta_seq){
+      
+      M = matrix(0,nrow=n,ncol=d)
+      
+      for (i in (1:n)){
+        M[i,] =  runif(d,-v,v)
+      }
+      
+      
+      M1 = matrix(0,samp_num,d)
+      
+      for (i in (1:samp_num)){
+        M1[i,] = runif(d,-1,1)
+      }
+      
+      In_cube = function(x,y,r){
+        
+        if (max( abs((x-y)) )<=r ){
+          1
+        }
+        else{0}
+      }
+      
+      output=0
+      for (i in (1:samp_num)){
+        In_one_cube = 0
+        for (j in c(1:n)){
+          In_one_cube=In_one_cube+ In_cube(M1[i,],M[j,],r)
+        }
+        if (In_one_cube>0){
+          output=output+1
+        }
+      }
+      
+      Results[which(r==r_seq),which(v==delta_seq)]=  Results[which(r==r_seq),which(v==delta_seq)]+output
+    }
+  }
+  Results
+}
+
+
+
+cl <- makeCluster(rep('localhost',6),type='SOCK')
+
+sample_cores = function(){
+  multi_core(samp_num=samp_num,d=d,n=n,r =r,v=v)
+}
+clusterExport(cl,c('multi_core','sample_cores','samp_num','d','n','r_seq','delta_seq'))
+data1 = clusterEvalQ(cl,sample_cores())
+stopCluster(cl)
+Results_matrix = (data1[[1]]+data1[[2]]+data1[[3]]+data1[[4]]+data1[[5]]+data1[[6]])/(samp_num*6)
+
+plot(delta_seq,Results_matrix[1,],type='l',ylim=c(0,1),ylab='Probability',xlab='delta',main='Cube: d=10, n=128',cex.main=2.5,cex.lab=2.5,cex.axis=2,lwd=2,col=1)
+for (i in 1:nrow(Results_matrix)){
+  lines(delta_seq,Results_matrix[i,],col=i,lwd=2)
+}
+
+int_of_G = function(delta,r,k){
+  
+  if(k>0){
+    if ((delta-r)<=1&(delta-r)>0){
+      (2*(r/delta)^(k))*(delta-r) - delta*(1/(2^(k-1)*(k+1)))*((1+(r-1)/delta )^(k+1) - (2*r/delta )^(k+1))
+    }
+    else if ((r-delta)<=1 & (r+delta)>=1 ){
+      (2)*(r-delta)-delta*(1/(2^(k-1)*(k+1)))*((1+(r-1)/delta )^(k+1) - (2 )^(k+1))
+    } 
+    else if ((r-delta)<=1 ){
+      (2)*(r-delta) +4*delta*(1/(k+1))
+    }
+  }
+  else{2 }
+}
+
+
+int_of_G2 = function(delta,r,k){
+  
+  if(k>0){
+    if ((delta-r)<=1&(delta-r)>0){
+      (delta-r)*(r/delta)^k - ((2*delta)/(k+1))*( ((delta+r-1)/(2*delta))^(k+1) - (r/delta)^(k+1)  )
+    }
+    else if ((r-delta)<=1 & (r+delta)>=1 ){
+      (r-delta) - ((2*delta)/(k+1))*( ((delta+r-1)/(2*delta))^(k+1) -1   )
+    } 
+    else if ((r-delta)<=1 ){
+      (r-delta) +2*delta*(1/(k+1))
+    }
+  }
+  else{1 }
+}
+
+
+out = matrix(0,nrow=length(r_seq),ncol=length(delta_seq))
+out2 = matrix(0,nrow=length(r_seq),ncol=length(delta_seq))
+for (r in r_seq){
+  for (delta in delta_seq){
+    
+    
+    sum = 0
+    sum2 = 0
+    t=r/delta
+    for (k in (0:n)){
+      G2 = function(x){
+        G(x)^k
+      }
+      G2 = Vectorize(G2)
+      
+      sum = sum + (1/(2^d))*((-1)^k)*choose(n,k)*int_of_G(delta,r,k)^d #   #integrate(G2,-1,1,rel.tol = 10^-10)$value^d  
+      sum2 = sum2 + ((-1)^k)*choose(n,k)*int_of_G2(delta,r,k)^d  # #integrate(G2,-1,1,rel.tol = 10^-10)$value^d  
+      print( (1/(2^d))*((-1)^k)*choose(n,k)*int_of_G(delta,r,k)^d)
+      print(((-1)^k)*choose(n,k)*int_of_G2(delta,r,k)^d )
+    }
+    out[which(r==r_seq),which(delta==delta_seq)]= 1-sum
+    out2[which(r==r_seq),which(delta==delta_seq)]= 1-sum2
+  }
+  
+  
+}
+
+plot(delta_seq,out[1,],type='l',ylim=c(0,1),cex.main=2,cex.lab=2,cex.axis=1.5,col='black',axes=FALSE,xlab='',ylab='',lwd=3)
+axis(1, mgp=c(3, 1.8, 0),cex.axis=3)
+axis(2, mgp=c(3, 1.2, 0),cex.axis=3)
+mtext(side=3, text=expression(bold("Cube : d=10")), line=0.8,cex=3,font.lab=2)
+box(lty = 1, col = 'black')
+par(mar=c(5.1,7.2,4.1,2.1))
+mtext(side=1, text=expression(paste(delta)), line=4,cex=4)
+mtext(side=2, text="", line=3.5,cex=2)
+
+
+
+for ( i in c(1:length(r_seq))){
+  lines(delta_seq,out2[i,],col=i,lwd=3)
+}
+
+
+
+
+############################################
+#### Quantization ####
+############################################
+
+
+# Depending on the scheme of interest,  the below code will reproduce Figures 7.33 -- 7.40.  Figures in tables for quantization 
+# can also be obtained with the following Monte carlo simulations
+
+###############################
+## Scheme 1
+###############################
+
+
+d=50
+n=512
+delta_seq=seq(0.1,1,0.1)
+samp_num=200
+
+
+multi_core = function(samp_num,d,n,r,v){
+  
+  Results = matrix(0,nrow=1,ncol=length(delta_seq))
+  for (v in delta_seq){
+    
+    M = matrix(0,nrow=n,ncol=d)
+    
+    for (i in (1:n)){
+      M[i,] =  runif(d,-v,v)
+    }
+    
+    
+    M1 = matrix(0,samp_num,d)
+    
+    for (i in (1:samp_num)){
+      M1[i,] = runif(d,-1,1)
+    }
+    
+    In_circle = function(x,y,r){
+      
+      if (sqrt( sum((x-y)^2) )<=r ){
+        1
+      }
+      else{0}
+    }
+    
+    min_distance = NULL
+    for (i in (1:samp_num)){
+      dist2 = NULL
+      for (j in c(1:n)){
+        dist2 =  c(dist2,(sum((M1[i,]-M[j,])^2 )))
+      }
+      min_distance=c(min_distance,min(dist2))
+    }
+    
+    Results[1,which(v==delta_seq)]=  Results[1,which(v==delta_seq)]+mean(min_distance)
+  }
+  Results
+}
+
+
+cl <- makeCluster(rep('localhost',6),type='SOCK')
+
+sample_cores = function(){
+  multi_core(samp_num=samp_num,d=d,n=n,r =r,v=v)
+}
+clusterExport(cl,c('multi_core','sample_cores','samp_num','d','n','r_seq','delta_seq'))
+data1 = clusterEvalQ(cl,sample_cores())
+stopCluster(cl)
+Results_matrix = (data1[[1]]+data1[[2]]+data1[[3]]+data1[[4]]+data1[[5]]+data1[[6]])/6
+
+
+plot(delta_seq,Results_matrix[1,],type='l',cex.main=2,cex.lab=2,cex.axis=1.5,col='black',axes=FALSE,xlab='',ylab='',lwd=3)
+axis(1, mgp=c(3, 1.8, 0),cex.axis=3)
+axis(2, mgp=c(3, 1.2, 0),cex.axis=3)
+mtext(side=3, text=expression(bold("")), line=0.8,cex=3,font.lab=2)
+box(lty = 1, col = 'black')
+par(mar=c(5.1,7.2,4.1,2.1))
+mtext(side=1, text=expression(paste(delta)), line=4,cex=4)
+
+
+## Approximation for quantization with improved CLT
+
+approx_quant = NULL
+
+for (delta in delta_seq){
+  approx_check = function(r){
+    
+    int = function(s){
+      cs = (3*(r/delta)^2-(d+2*s*sqrt(d/5))/(delta^2)-d  )/(2*sqrt((d+2*s*sqrt(d/5))/(delta^2)+d/5 ))
+      exp(-n*( pnorm(cs )  + (1+4/d)*(((d+2*s*sqrt(d/5))/(delta^2) +d/21)/(5*( (d+2*s*sqrt(d/5))/(delta^2) +d/5 )^(3/2)))*(1-cs^2)*dnorm(cs)    ) )*dnorm(s)
+    }
+    
+    int = Vectorize(int)
+    1-  integrate(int,-3.5,3.5)$value
+  }
+
+  grd2 = function(r){
+    numDeriv::grad(approx_check,r)
+  }
+
+  vv1 = function(r){
+    r^2*grd2(r)
+  }
+  
+  vv1 = Vectorize(vv1)
+  
+  approx_quant= c(approx_quant,integrate(vv1,0,Inf)$value)
+}
+
+lines(delta_seq,approx_quant,col='red',lwd=3)
+
+
+###############################
+## Scheme 3
+###############################
+
+
+
+d=8
+n=2^(d-1)
+A = FrF2:: FrF2(n,d)
+A=as.matrix(A)
+A = matrix(as.numeric(A),nrow=n,ncol=d)
+samp_num=500
+delta_seq=seq(0,1,0.01)
+
+
+
+multi_core = function(samp_num,d,n,r,v){
+  
+  Results = matrix(0,nrow=1,ncol=length(delta_seq))
+  for (v in delta_seq){
+    
+    M = matrix(0,n,d)
+    
+    for (i in (1:n)){
+      
+      M[i,] =  v*(A[i,])
+    }
+    
+    M1 = matrix(0,samp_num,d)
+    
+    for (i in (1:samp_num)){
+      M1[i,] = runif(d,-1,1)
+    }
+    
+    In_circle = function(x,y,r){
+      
+      if (sqrt( sum((x-y)^2) )<=r ){
+        1
+      }
+      else{0}
+    }
+    
+    min_distance = NULL
+    for (i in (1:samp_num)){
+      dist2 = NULL
+      for (j in c(1:n)){
+        dist2 =  c(dist2,(sum((M1[i,]-M[j,])^2 )))
+      }
+      min_distance=c(min_distance,min(dist2))
+    }
+    
+    Results[1,which(v==delta_seq)]=  Results[1,which(v==delta_seq)]+mean(min_distance)
+  }
+  Results
+}
+
+
+cl <- makeCluster(rep('localhost',6),type='SOCK')
+
+start=Sys.time()
+sample_cores = function(){
+  multi_core(samp_num=samp_num,d=d,n=n,r =r,v=v)
+}
+clusterExport(cl,c('multi_core','sample_cores','samp_num','d','n','r_seq','delta_seq','A'))
+data1 = clusterEvalQ(cl,sample_cores())
+stopCluster(cl)
+Results_matrix = (data1[[1]]+data1[[2]]+data1[[3]]+data1[[4]]+data1[[5]]+data1[[6]])/6
+Sys.time()-start
+
+
+plot(delta_seq,Results_matrix[1,]/(d*(2^(2/d) )),type='l',cex.main=2,cex.lab=2,cex.axis=1.5,col='black',axes=FALSE,xlab='',ylab='',lwd=3)
+axis(1, mgp=c(3, 1.8, 0),cex.axis=3)
+axis(2, mgp=c(3, 1.2, 0),cex.axis=3)
+mtext(side=3, text=expression(bold("Scheme 3: d=50")), line=0.8,cex=3,font.lab=2)
+box(lty = 1, col = 'black')
+par(mar=c(5.1,7.2,4.1,2.1))
+mtext(side=1, text=expression(paste(delta)), line=4,cex=4)
+mtext(side=2, text=expression(paste(E,theta)[n]), line=4,cex=4)
+
+
+###############################
+## Scheme 4
+###############################
+
+d=50
+n=1024
+alpha=0.5
+samp_num=2000
+delta_seq=seq(0,1,0.04)
+
+
+multi_core = function(samp_num,d,n,r,v){
+  
+  Results = matrix(0,nrow=1,ncol=length(delta_seq))
+  for (v in delta_seq){
+    
+    M = matrix(0,nrow=n,ncol=d)
+    
+    for (i in (1:n)){
+      M[i,] =  v*(2*rbeta(d,alpha,alpha)-1)
+    }
+    
+    
+    M1 = matrix(0,samp_num,d)
+    
+    for (i in (1:samp_num)){
+      M1[i,] = runif(d,-1,1)
+    }
+    
+    In_circle = function(x,y,r){
+      
+      if (sqrt( sum((x-y)^2) )<=r ){
+        1
+      }
+      else{0}
+    }
+    
+    min_distance = NULL
+    for (i in (1:samp_num)){
+      dist2 = NULL
+      for (j in c(1:n)){
+        dist2 =  c(dist2,(sum((M1[i,]-M[j,])^2 )))
+      }
+      min_distance=c(min_distance,min(dist2))
+    }
+    
+    Results[1,which(v==delta_seq)]=  Results[1,which(v==delta_seq)]+mean(min_distance)
+  }
+  Results
+}
+
+
+cl <- makeCluster(rep('localhost',6),type='SOCK')
+
+start=Sys.time()
+sample_cores = function(){
+  multi_core(samp_num=samp_num,d=d,n=n,r =r,v=v)
+}
+clusterExport(cl,c('multi_core','sample_cores','samp_num','d','n','r_seq','delta_seq','alpha'))
+data1 = clusterEvalQ(cl,sample_cores())
+stopCluster(cl)
+Results_matrix = (data1[[1]]+data1[[2]]+data1[[3]]+data1[[4]]+data1[[5]]+data1[[6]])/6
+Sys.time()-start
+
+
+plot(delta_seq,Results_matrix[1,],type='l',cex.main=2,cex.lab=2,cex.axis=1.5,col='black',axes=FALSE,xlab='',ylab='',lwd=3)
+axis(1, mgp=c(3, 1.8, 0),cex.axis=3)
+axis(2, mgp=c(3, 1.2, 0),cex.axis=3)
+mtext(side=3, text=expression(bold("d=10")), line=0.8,cex=3,font.lab=2)
+box(lty = 1, col = 'black')
+par(mar=c(5.1,7.2,4.1,2.1))
+mtext(side=1, text=expression(paste(delta)), line=4,cex=4)
+mtext(side=2, text="", line=3.5,cex=2)
+
+
+###############################
+## Scheme 7
+###############################
+
+
+d=50
+n=1024
+samp_num=200
+delta_seq=seq(0,1,0.04)
+
+
+multi_core = function(samp_num,d,n,r,v){
+  
+  Results = matrix(0,nrow=1,ncol=length(delta_seq))
+  for (v in delta_seq){
+    M = matrix(0,nrow=n,ncol=d)
+
+    M =  v*(2*sobolSequence.points(d, dimF2=10, count=n)-1)
+    
+    M1 = matrix(0,samp_num,d)
+    
+    for (i in (1:samp_num)){
+      M1[i,] = runif(d,-1,1)
+    }
+    
+    In_circle = function(x,y,r){
+      
+      if (sqrt( sum((x-y)^2) )<=r ){
+        1
+      }
+      else{0}
+    }
+    
+    min_distance = NULL
+    for (i in (1:samp_num)){
+      dist2 = NULL
+      for (j in c(1:n)){
+        dist2 =  c(dist2,(sum((M1[i,]-M[j,])^2 )))
+      }
+      min_distance=c(min_distance,min(dist2))
+    }
+    
+    Results[1,which(v==delta_seq)]=  Results[1,which(v==delta_seq)]+mean(min_distance)
+  }
+  Results
+}
+
+cl <- makeCluster(rep('localhost',6),type='SOCK')
+
+sample_cores = function(){
+  multi_core(samp_num=samp_num,d=d,n=n,r =r,v=v)
+}
+clusterExport(cl,c('multi_core','sample_cores','samp_num','d','n','r_seq','delta_seq','sobolSequence.points'))
+data1 = clusterEvalQ(cl,sample_cores())
+stopCluster(cl)
+Results_matrix = (data1[[1]]+data1[[2]]+data1[[3]]+data1[[4]]+data1[[5]]+data1[[6]])/6
+
+plot(delta_seq,Results_matrix[1,],type='l',cex.main=2,cex.lab=2,cex.axis=1.5,col='black',axes=FALSE,xlab='',ylab='',lwd=3)
+axis(1, mgp=c(3, 1.8, 0),cex.axis=3)
+axis(2, mgp=c(3, 1.2, 0),cex.axis=3)
+mtext(side=3, text=expression(bold("d=10")), line=0.8,cex=3,font.lab=2)
+box(lty = 1, col = 'black')
+par(mar=c(5.1,7.2,4.1,2.1))
+mtext(side=1, text=expression(paste(delta)), line=4,cex=4)
+mtext(side=2, text="", line=3.5,cex=2)
+
+
+
+
+
+
+
